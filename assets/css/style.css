@@ -1,0 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --primary-purple: #6F2C91;
+    --dark-purple: #4B145F;
+    --lavender-bg: #F7F0FA;
+    --light-border: #E6D8EF;
+    --gold-accent: #C9A646;
+    --text-dark: #2D2433;
+    --text-muted: #7A6B82;
+    --white: #FFFFFF;
+    --success-green: #2ecc71;
+    --error-red: #ef4444;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    color: var(--text-dark);
+    background-color: var(--lavender-bg); /* Soft background for modern look */
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Hide scrollbar for horizontal scroll areas */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Wizard Animations */
+.wizard-step-content {
+    display: none;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.wizard-step-content.active {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* JS Toggled Selection States */
+.selection-card {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.selection-card.selected {
+    border-color: var(--primary-purple);
+    background-color: #f3e8f9; /* Lighter lavender */
+    box-shadow: 0 10px 25px -5px rgba(111, 44, 145, 0.1), 0 8px 10px -6px rgba(111, 44, 145, 0.1);
+}
+
+.beautician-avatar {
+    transition: all 0.3s ease;
+    border: 3px solid transparent;
+}
+
+.beautician-card.selected .beautician-avatar {
+    border-color: var(--primary-purple);
+    transform: scale(1.05);
+}
+
+.beautician-card.selected .beautician-name {
+    color: var(--primary-purple);
+    font-weight: 600;
+}
+
+.date-card {
+    transition: all 0.3s ease;
+}
+
+.date-card.selected {
+    background-color: var(--primary-purple);
+    border-color: var(--primary-purple);
+    color: white;
+}
+.date-card.selected .date-subtext {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+
+/* Time Slot States */
+.time-slot {
+    transition: all 0.2s ease;
+    border: 2px solid var(--light-border);
+}
+
+.time-slot:not(.disabled):hover {
+    border-color: var(--primary-purple);
+    color: var(--primary-purple);
+}
+
+.time-slot.selected, .time-slot.hover-range {
+    background-color: var(--primary-purple);
+    border-color: var(--primary-purple);
+    color: var(--white);
+}
+
+.time-slot.hover-range {
+    opacity: 0.8;
+}
+
+.time-slot.disabled {
+    background-color: #f3f4f6; /* gray-100 */
+    color: #9ca3af; /* gray-400 */
+    cursor: not-allowed;
+    border-color: #e5e7eb; /* gray-200 */
+}
+
+.time-slot.invalid-range {
+    background-color: #fee2e2; /* red-100 */
+    border-color: #fca5a5; /* red-300 */
+    color: #b91c1c; /* red-700 */
+    cursor: not-allowed;
+}
+
+/* Service Button Dynamic States */
+.btn-add-service.added {
+    background-color: #f3f4f6 !important; /* Tailwind gray-100 */
+    color: #6b7280 !important; /* Tailwind gray-500 */
+    border-color: transparent !important;
+}
+.btn-add-service.added:hover {
+    background-color: #fee2e2 !important; /* Tailwind red-100 */
+    color: #ef4444 !important; /* Tailwind red-500 */
+}
