@@ -142,7 +142,7 @@ $pageTitle = "Terms & Conditions";
                             </div>
                             <div class="flex-1">
                                 <strong class="text-dark block mb-2 text-lg">Get in Touch</strong>
-                                <span class="text-gray-500 block mb-1">Email: <a href="mailto:hello@rupinis.com" class="text-primary font-medium hover:underline">hello@rupinis.com</a></span>
+                                <span class="text-gray-500 block mb-1">Email: <a href="mailto:rupinisit@gmail.com" class="text-primary font-medium hover:underline">rupinisit@gmail.com</a></span>
                                 <span class="text-gray-500 block">Phone: <a href="tel:+6561234567" class="text-primary font-medium hover:underline">+65 6123 4567</a></span>
                             </div>
                         </div>

@@ -1,5 +1,6 @@
 <?php
 $current_page = basename($_SERVER['PHP_SELF']);
+require_once __DIR__ . '/db.php';
 ?>
 <!-- Tailwind CSS Header -->
 <header class="bg-white/95 backdrop-blur-md sticky top-0 z-50 border-b border-light/50 shadow-sm">

@@ -72,7 +72,7 @@
                             </div>
                             <div>
                                 <h4 class="text-sm font-bold text-white/70 uppercase tracking-wider mb-1">Email</h4>
-                                <p class="text-lg">hello@rupinis.com</p>
+                                <p class="text-lg">rupinisit@gmail.com</p>
                             </div>
                         </div>
                         
@@ -107,16 +107,36 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label for="phone" class="block text-sm font-bold text-dark mb-2">Phone Number</label>
-                                <div class="flex">
-                                    <select id="country_code" name="country_code" class="px-2 sm:px-4 py-3 rounded-l-xl border border-r-0 border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all bg-gray-50 text-gray-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23131313%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:10px_10px] bg-[position:right_10px_center] pr-8 text-sm">
-                                        <option value="+65">🇸🇬 +65</option>
-                                        <option value="+60">🇲🇾 +60</option>
-                                        <option value="+62">🇮🇩 +62</option>
-                                    </select>
-                                    <input type="tel" id="phone" name="phone" class="w-full px-4 py-3 rounded-r-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all bg-gray-50" placeholder="9123 4567">
+                                <div class="w-full">
+                                    <input type="tel" id="phone" name="phone" class="w-full px-4 py-3 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all bg-gray-50" placeholder="9123 4567">
                                 </div>
                                 <p class="text-red-500 text-xs font-bold mt-1 hidden err-msg" id="err-phone">Phone number is required.</p>
                             </div>
+                            
+                            <!-- Add intl-tel-input CSS & JS for real flags -->
+                            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css"/>
+                            <style>
+                                .iti { width: 100%; }
+                                .iti__flag { background-image: url("https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/img/flags.png"); }
+                                @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+                                  .iti__flag { background-image: url("https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/img/flags@2x.png"); }
+                                }
+                                /* Fix padding for our custom input */
+                                .iti__flag-container { border-radius: 0.75rem 0 0 0.75rem; }
+                            </style>
+                            <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
+                            <script>
+                                document.addEventListener("DOMContentLoaded", function() {
+                                    var input = document.querySelector("#phone");
+                                    window.intlTelInput(input, {
+                                        initialCountry: "sg",
+                                        preferredCountries: ["sg", "my", "id", "in"],
+                                        separateDialCode: true,
+                                        utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
+                                    });
+                                });
+                            </script>
+                            
                             <div>
                                 <label for="service" class="block text-sm font-bold text-dark mb-2">Interested Service</label>
                                 <select id="service" name="service" class="w-full px-4 py-3 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all bg-gray-50 appearance-none">
@@ -214,12 +234,27 @@
                     let originalText = btn.text();
                     btn.prop('disabled', true).html('<svg class="w-5 h-5 animate-spin mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>');
                     
-                    // Simulate AJAX call
-                    setTimeout(function() {
-                        $('#contact-form').fadeOut(300, function() {
-                            $('#contact-success').removeClass('hidden').addClass('flex').hide().fadeIn(300);
-                        });
-                    }, 800);
+                    // AJAX call to send email via SMTP
+                    $.ajax({
+                        url: 'api/contact_submit.php',
+                        type: 'POST',
+                        data: $('#contact-form').serialize(),
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                $('#contact-form').fadeOut(300, function() {
+                                    $('#contact-success').removeClass('hidden').addClass('flex').hide().fadeIn(300);
+                                });
+                            } else {
+                                alert(response.message || 'An error occurred while sending your message. Please try again.');
+                                btn.prop('disabled', false).html(originalText);
+                            }
+                        },
+                        error: function() {
+                            alert('A network error occurred. Please try again.');
+                            btn.prop('disabled', false).html(originalText);
+                        }
+                    });
                 }
             });
             

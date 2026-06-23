@@ -81,10 +81,10 @@
                 <div class="p-8 lg:p-12 lg:w-3/5 flex flex-col justify-center">
                     <div
                         class="inline-flex items-center text-sm font-bold text-primary bg-primary/10 px-4 py-1.5 rounded-full mb-4 w-fit">
-                        Flagship Branch</div>
+                        Main Branch</div>
                     <h2 class="text-3xl font-bold text-dark mb-4">Little India</h2>
                     <p class="text-gray-600 mb-8 leading-relaxed">Experience our heritage at the original Rupini's
-                        flagship store. A spacious sanctuary offering our complete range of treatments in an authentic,
+                        main branch. A spacious sanctuary offering our complete range of treatments in an authentic,
                         luxurious setting.</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -107,7 +107,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg> Hours</h4>
-                            <p class="text-gray-600 text-sm">Mon-Fri: 10:00 AM - 9:00 PM<br>Sat-Sun: 9:00 AM - 8:00 PM
+                            <p class="text-gray-600 text-sm">Mon-Sat - 9.30 AM to 8.30 PM<br>Sunday - 9.30 AM to 6.00 PM<br>Public Holiday Working Hours - 9.30 AM to 6.00 PM
                             </p>
                         </div>
                     </div>

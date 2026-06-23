@@ -54,6 +54,32 @@
     <!-- Header -->
     <?php include 'includes/header.php'; ?>
 
+    <?php
+    // Fetch active discounts specifically for the index page banners
+    $active_offers = [];
+    $popular_categories = [];
+    try {
+        $stmt = $pdo->prepare("SELECT discount_percentage, discount_amount, is_first_time_user, is_birthday_coupon, discount_code FROM oc_discounts WHERE status = 1 AND deleted = 0 AND (expiry_date_end >= CURDATE() OR expiry_date_end IS NULL OR expiry_date_end = '0000-00-00') ORDER BY discount_id DESC");
+        $stmt->execute();
+        $active_offers = $stmt->fetchAll();
+
+        // Fetch favorite categories for Popular Services
+        $stmt_cat = $pdo->prepare("
+            SELECT c.catid, c.cattitle, MIN(NULLIF(p.prdt_final_price, 0)) as min_price, 
+                   (SELECT prd_image FROM oc_product WHERE catid = c.catid AND prd_image IS NOT NULL AND prd_image != '' AND status=1 AND deleted=0 ORDER BY prdt_pos ASC LIMIT 1) as cat_image
+            FROM oc_product_cat c 
+            LEFT JOIN oc_product p ON c.catid = p.catid AND p.status = 1 AND p.deleted = 0 AND p.prdt_name NOT LIKE '%Coffee%'
+            WHERE c.favourite_status = 1 AND c.status = 1
+            GROUP BY c.catid, c.cattitle
+            ORDER BY IF(c.catorder > 0, 0, 1) ASC, c.catorder ASC, c.cattitle ASC
+            LIMIT 6
+        ");
+        $stmt_cat->execute();
+        $popular_categories = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\PDOException $e) {
+        // Ignore DB errors
+    }
+    ?>
     <!-- 1. Premium Immersive Hero Section -->
     <section class="relative min-h-[calc(100vh-80px)] flex items-center justify-center overflow-hidden bg-dark py-20">
         <!-- Background Auto Slider -->
@@ -65,23 +91,11 @@
                 class="w-full h-full object-cover absolute top-0 left-0 transition-opacity duration-1000 ease-in-out opacity-0 slide-img">
             <img src="assets/images/hero_3.png" alt="Rupinis Spa Ambience"
                 class="w-full h-full object-cover absolute top-0 left-0 transition-opacity duration-1000 ease-in-out opacity-0 slide-img">
+            <img src="assets/images/hero_4.png" alt="Rupinis Spa Experience"
+                class="w-full h-full object-cover absolute top-0 left-0 transition-opacity duration-1000 ease-in-out opacity-0 slide-img">
+            <img src="assets/images/hero_5.png" alt="Rupinis Spa Relaxation"
+                class="w-full h-full object-cover absolute top-0 left-0 transition-opacity duration-1000 ease-in-out opacity-0 slide-img">
         </div>
-
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                const slides = document.querySelectorAll('.slide-img');
-                if (slides.length > 0) {
-                    let current = 0;
-                    setInterval(() => {
-                        slides[current].classList.remove('opacity-100');
-                        slides[current].classList.add('opacity-0');
-                        current = (current + 1) % slides.length;
-                        slides[current].classList.remove('opacity-0');
-                        slides[current].classList.add('opacity-100');
-                    }, 4000); // Change image every 4 seconds
-                }
-            });
-        </script>
 
         <!-- Natural Dark Overlay -->
         <div class="absolute inset-0 bg-black/40"></div>
@@ -122,32 +136,108 @@
                 </a>
             </div>
         </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const slides = document.querySelectorAll('.slide-img');
+                if (slides.length > 0) {
+                    let current = 0;
+                    setInterval(() => {
+                        slides[current].classList.remove('opacity-100');
+                        slides[current].classList.add('opacity-0');
+                        current = (current + 1) % slides.length;
+                        slides[current].classList.remove('opacity-0');
+                        slides[current].classList.add('opacity-100');
+                    }, 4000); // Change image every 4 seconds
+                }
+            });
+        </script>
+
+
     </section>
 
-    <!-- 1.5 First-Time Trial Promo -->
-    <section class="bg-primary overflow-hidden relative border-y border-dark/20">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
-            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div class="flex items-center gap-4 text-white">
-                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-lg md:text-xl">First-Time Customer? Get 20% Off!</h3>
-                        <p class="text-white/80 text-sm">Experience the Rupini's standard with a special discount on
-                            your first facial or threading service.</p>
+    <?php if (!empty($active_offers)): ?>
+        <!-- 1.5 Special Offers Banner Slider -->
+        <section class="bg-primary overflow-hidden relative border-y border-dark/20 h-auto" id="offer-slider-container">
+            <?php 
+            foreach ($active_offers as $index => $active_offer):
+                $discount_text = floatval($active_offer['discount_percentage']) > 0 ? floatval($active_offer['discount_percentage']) . '% Off!' : '$' . floatval($active_offer['discount_amount']) . ' Off!';
+                
+                if ($active_offer['is_birthday_coupon']) {
+                    $title = "Happy Birthday! Get $discount_text";
+                    $msg = "Celebrate your special day with Rupini's.";
+                } elseif ($active_offer['is_first_time_user']) {
+                    $title = "First-Time Customer? Get $discount_text";
+                    $msg = "Experience the Rupini's standard.";
+                } else {
+                    $title = "Special Offer! Get $discount_text";
+                    $msg = "Treat yourself to our premium services.";
+                }
+                
+                $code = htmlspecialchars($active_offer['discount_code'] ?? 'PROMO');
+            ?>
+            <div class="offer-slide w-full transition-opacity duration-1000 ease-in-out <?php echo $index === 0 ? 'opacity-100 relative' : 'opacity-0 absolute top-0 left-0 w-full h-full pointer-events-none'; ?>">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                    <div class="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6">
+                        <div class="flex items-center gap-4 text-white">
+                            <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-base sm:text-lg md:text-xl leading-tight"><?php echo $title; ?></h3>
+                                <p class="text-xs sm:text-sm text-white/90 mt-0.5 flex flex-wrap items-center gap-1">
+                                    <?php echo $msg; ?> Use code: 
+                                    <strong class="text-white font-bold tracking-wider border-b border-dashed border-white/60 ml-1"><?php echo $code; ?></strong>
+                                    <button type="button" onclick="copyPromoCode('<?php echo $code; ?>', this)" class="ml-2 hover:text-light transition-colors p-1 bg-white/10 rounded pointer-events-auto" title="Copy to clipboard">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    </button>
+                                </p>
+                            </div>
+                        </div>
+                        <a href="book.php?promo=<?php echo urlencode($code); ?>"
+                            class="pointer-events-auto shrink-0 px-8 py-3 bg-white text-primary font-bold rounded-full hover:bg-gray-100 transition-colors shadow-lg shadow-black/10 transform hover:-translate-y-0.5 text-sm sm:text-base w-full md:w-auto text-center">
+                            Claim Offer
+                        </a>
                     </div>
                 </div>
-                <a href="book.php"
-                    class="shrink-0 px-8 py-3 bg-white text-primary font-bold rounded-full hover:bg-gray-100 transition-colors shadow-lg shadow-black/10 transform hover:-translate-y-0.5">
-                    Claim Offer
-                </a>
             </div>
-        </div>
-    </section>
+            <?php endforeach; ?>
+        </section>
+
+        <script>
+        function copyPromoCode(code, btn) {
+            navigator.clipboard.writeText(code).then(() => {
+                const originalSvg = btn.innerHTML;
+                btn.innerHTML = '<svg class="w-4 h-4 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                setTimeout(() => {
+                    btn.innerHTML = originalSvg;
+                }, 2000);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const slides = document.querySelectorAll('.offer-slide');
+            if (slides.length > 1) {
+                let currentSlide = 0;
+                setInterval(() => {
+                    // Hide current
+                    slides[currentSlide].classList.remove('opacity-100', 'relative');
+                    slides[currentSlide].classList.add('opacity-0', 'absolute', 'top-0', 'left-0', 'pointer-events-none');
+                    
+                    // Move to next
+                    currentSlide = (currentSlide + 1) % slides.length;
+                    
+                    // Show next
+                    slides[currentSlide].classList.remove('opacity-0', 'absolute', 'top-0', 'left-0', 'pointer-events-none');
+                    slides[currentSlide].classList.add('opacity-100', 'relative');
+                }, 5000); // 5 seconds per slide
+            }
+        });
+        </script>
+    <?php endif; ?>
 
     <!-- 2. Features / Why Choose Us -->
     <section class="py-24 bg-[#faf7fc]">
@@ -238,87 +328,54 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- Service 1 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-[#faf7fc] border border-light/50 hover:shadow-float transition-all duration-300">
+                <?php foreach ($popular_categories as $index => $cat): 
+                    $cattitle = $cat['cattitle'];
+                    if ($cattitle == 'Hair Henna / Indigo Coloring') {
+                        $img_name = 'cat_hair_henna.png';
+                    } elseif ($cattitle == 'Shirupini Scalp Care') {
+                        $img_name = 'cat_scalp_care.png';
+                    } else {
+                        $img_name = 'cat_' . str_replace(' ', '_', strtolower($cattitle)) . '.png';
+                    }
+                    $img_src = 'uploads/' . $img_name;
+                    
+                    // Fallback just in case
+                    if (!file_exists($img_src)) {
+                        $img_src = !empty($cat['cat_image']) ? 'uploads/services/' . htmlspecialchars($cat['cat_image']) : 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?q=80&w=2070&auto=format&fit=crop';
+                    }
+
+                    $min_price = $cat['min_price'] ? number_format($cat['min_price'], 2) : '0.00';
+                ?>
+                <div class="group rounded-3xl overflow-hidden bg-[#faf7fc] border border-light/50 hover:shadow-float transition-all duration-300 flex flex-col">
                     <div class="h-64 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?q=80&w=2070&auto=format&fit=crop"
-                            alt="Spa Facial"
+                        <img src="<?php echo $img_src; ?>"
+                            alt="<?php echo htmlspecialchars($cat['cattitle']); ?>"
                             class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                        <div
-                            class="absolute bottom-4 left-4 text-white font-bold px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-sm">
-                            Most Popular</div>
+                        <?php if ($index === 0): ?>
+                        <div class="absolute bottom-4 left-4 text-white font-bold px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-sm">
+                            Most Popular
+                        </div>
+                        <?php endif; ?>
                     </div>
-                    <div class="p-8">
-                        <h3 class="text-2xl font-bold text-dark mb-3">Signature Facial</h3>
-                        <p class="text-gray-600 mb-6 line-clamp-2">A deep-cleansing facial tailored to your skin type,
-                            leaving you with a radiant, youthful glow.</p>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xl font-black text-primary">$85.00</span>
-                            <a href="book.php" aria-label="Book Signature Facial"
-                                class="text-primary font-bold hover:text-dark flex items-center">
-                                Book Now <svg class="w-4 h-4 ml-1" aria-hidden="true" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 5l7 7-7 7" />
+                    <div class="p-8 flex-1 flex flex-col">
+                        <h3 class="text-2xl font-bold text-dark mb-3"><?php echo htmlspecialchars($cat['cattitle']); ?></h3>
+                        <p class="text-gray-600 mb-6 line-clamp-2">Explore our premium <?php echo htmlspecialchars($cat['cattitle']); ?> treatments tailored just for you.</p>
+                        <div class="mt-auto flex items-center justify-between">
+                            <div class="flex flex-col">
+                                <span class="text-sm text-gray-500 font-medium">Price at</span>
+                                <span class="text-xl font-black text-primary">$<?php echo $min_price; ?></span>
+                            </div>
+                            <a href="services.php?category=<?php echo urlencode($cat['cattitle']); ?>" aria-label="View <?php echo htmlspecialchars($cat['cattitle']); ?>"
+                                class="text-primary font-bold hover:text-dark flex items-center bg-primary/5 px-4 py-2 rounded-full transition-colors">
+                                View <svg class="w-4 h-4 ml-1" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                                 </svg>
                             </a>
                         </div>
                     </div>
                 </div>
-                <!-- Service 2 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-[#faf7fc] border border-light/50 hover:shadow-float transition-all duration-300">
-                    <div class="h-64 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop"
-                            alt="Massage"
-                            class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    </div>
-                    <div class="p-8">
-                        <h3 class="text-2xl font-bold text-dark mb-3">Aromatherapy Massage</h3>
-                        <p class="text-gray-600 mb-6 line-clamp-2">Melt away stress with a full-body massage using our
-                            custom-blended essential oils.</p>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xl font-black text-primary">$120.00</span>
-                            <a href="book.php" aria-label="Book Aromatherapy Massage"
-                                class="text-primary font-bold hover:text-dark flex items-center">
-                                Book Now <svg class="w-4 h-4 ml-1" aria-hidden="true" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 5l7 7-7 7" />
-                                </svg>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <!-- Service 3 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-[#faf7fc] border border-light/50 hover:shadow-float transition-all duration-300">
-                    <div class="h-64 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?q=80&w=2070&auto=format&fit=crop"
-                            alt="Threading"
-                            class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    </div>
-                    <div class="p-8">
-                        <h3 class="text-2xl font-bold text-dark mb-3">Precision Threading</h3>
-                        <p class="text-gray-600 mb-6 line-clamp-2">Expert eyebrow shaping and facial hair removal for
-                            perfectly defined features.</p>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xl font-black text-primary">$15.00</span>
-                            <a href="book.php" aria-label="Book Precision Threading"
-                                class="text-primary font-bold hover:text-dark flex items-center">
-                                Book Now <svg class="w-4 h-4 ml-1" aria-hidden="true" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 5l7 7-7 7" />
-                                </svg>
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </section>

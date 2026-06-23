@@ -1,0 +1,9 @@
+.env
+vendor/
+*.log
+*.sql
+*.sqlite
+.htaccess
+uploads/
+assets/images/
+assets/staff/

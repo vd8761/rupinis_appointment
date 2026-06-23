@@ -1,3 +1,42 @@
+<?php
+require_once 'includes/db.php';
+
+$active_branches = [];
+$service_categories = [];
+try {
+    $stmt = $pdo->prepare("SELECT branch_id, branch_name FROM oc_branch WHERE status = 1 AND deleted = 0 ORDER BY branch_id ASC");
+    $stmt->execute();
+    $active_branches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Fetch categories that have services
+    $stmt_cats = $pdo->prepare("SELECT catid, cattitle FROM oc_product_cat WHERE status = 1 ORDER BY IF(catorder > 0, 0, 1) ASC, catorder ASC, cattitle ASC");
+    $stmt_cats->execute();
+    $cats = $stmt_cats->fetchAll(PDO::FETCH_ASSOC);
+
+    // Fetch all active services
+    $stmt_srv = $pdo->prepare("SELECT prdt_id, catid, prdt_name, prdt_final_price, prdt_service_time FROM oc_product WHERE prdt_type = 2 AND prdt_pos = 1 AND status = 1 AND deleted = 0 AND prdt_name NOT LIKE '%Coffee%' ORDER BY prdt_name ASC");
+    $stmt_srv->execute();
+    $services = $stmt_srv->fetchAll(PDO::FETCH_ASSOC);
+
+    // Group services by category
+    foreach ($cats as $cat) {
+        $catServices = [];
+        foreach ($services as $s) {
+            if ($s['catid'] == $cat['catid']) {
+                $catServices[] = $s;
+            }
+        }
+        if (count($catServices) > 0) {
+            $cat['services'] = $catServices;
+            $service_categories[] = $cat;
+        }
+    }
+} catch (\PDOException $e) {
+    // Ignore DB errors
+}
+
+$promo_code = isset($_GET['promo']) ? htmlspecialchars(trim($_GET['promo']), ENT_QUOTES, 'UTF-8') : '';
+?>
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 
@@ -28,6 +67,10 @@
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
     <script>
         tailwind.config = {
             theme: {
@@ -45,6 +88,64 @@
 
         .custom-scrollbar::-webkit-scrollbar-track {
             background: transparent;
+        }
+
+        /* Select2 Tailwind Overrides */
+        .select2-container--default .select2-selection--single {
+            height: 100%;
+            border: none;
+            background: transparent;
+            display: flex;
+            align-items: center;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            color: #374151; /* gray-700 */
+            font-weight: 700;
+            padding-left: 0;
+            line-height: normal;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 100%;
+            right: 5px;
+        }
+        .select2-dropdown {
+            border: 1px solid #E6D8EF;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            z-index: 50;
+            background: #ffffff;
+        }
+        .select2-search--dropdown {
+            padding: 10px;
+            background: #faf7fc;
+            border-bottom: 1px solid #E6D8EF;
+        }
+        .select2-search--dropdown .select2-search__field {
+            border: 1px solid #E6D8EF;
+            border-radius: 0.5rem;
+            padding: 8px 12px;
+            outline: none;
+            width: 100%;
+            font-family: inherit;
+        }
+        .select2-search--dropdown .select2-search__field:focus {
+            border-color: #6F2C91;
+            box-shadow: 0 0 0 2px rgba(111, 44, 145, 0.2);
+        }
+        .select2-results__option {
+            padding: 10px 16px;
+            font-weight: 600;
+            color: #4B145F;
+            font-size: 15px;
+        }
+        .select2-container--default .select2-results__option--highlighted[aria-selected] {
+            background-color: #6F2C91;
+            color: white;
+        }
+        .select2-container--default .select2-results__option[aria-selected=true] {
+            background-color: #F7F0FA;
+            color: #6F2C91;
         }
 
         .custom-scrollbar::-webkit-scrollbar-thumb {
@@ -188,26 +289,99 @@
                     <div id="booking-form" class="p-6 md:p-10 space-y-12">
 
                         <!-- Section 1: Outlet -->
-                        <div id="sec-outlet" class="scroll-mt-32">
+                        <!-- Section 1: Mobile Number -->
+                        <div id="sec-mobile" class="scroll-mt-32">
                             <div class="flex items-center gap-3 mb-6">
                                 <div
                                     class="w-8 h-8 rounded-full bg-dark text-white flex items-center justify-center font-bold text-sm shadow-md">
                                     1</div>
+                                <h2 class="text-2xl font-bold text-dark">Your Mobile Number</h2>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-bold text-dark mb-2">Mobile Number <span
+                                        class="text-error">*</span></label>
+                                <div class="flex shadow-sm rounded-xl relative border border-light focus-within:ring-2 focus-within:ring-primary focus-within:border-primary bg-gray-50 transition-all overflow-hidden">
+                                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
+                                        <img src="https://flagcdn.com/w20/sg.png" alt="SG" class="w-5 h-auto rounded-sm object-cover shadow-sm">
+                                    </div>
+                                    <select id="f-cc"
+                                        class="pl-12 pr-4 py-4 bg-transparent border-0 focus:ring-0 outline-none text-gray-700 font-bold text-lg appearance-none relative z-0 border-r border-light rounded-none">
+                                        <option value="+65">+65</option>
+                                    </select>
+                                    <input type="tel" id="f-mobile"
+                                        class="w-full pl-5 pr-20 py-4 bg-transparent border-0 focus:ring-0 outline-none transition-all text-lg"
+                                        placeholder="9123 4567" maxlength="8">
+                                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                                        <span id="mobile-counter" class="text-sm font-medium text-gray-400 hidden">0/8</span>
+                                    </div>
+                                </div>
+                                <p class="hidden text-error text-sm font-bold mt-2 err-msg" id="err-mobile">
+                                    <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Mobile number is required.
+                                </p>
+                            </div>
+                            
+                            <!-- Customer Details (Hidden until mobile is entered) -->
+                            <div id="customer-details" class="hidden space-y-4 mt-6 p-5 bg-gray-50 border border-light rounded-xl">
+                                <div>
+                                    <label class="block text-sm font-bold text-dark mb-2">Full Name <span
+                                            class="text-error">*</span></label>
+                                    <input type="text" id="f-name"
+                                        class="w-full px-5 py-3 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white transition-all text-lg"
+                                        placeholder="e.g. Amanda Tan">
+                                    <p class="hidden text-error text-sm font-bold mt-2 err-msg" id="err-name">
+                                        <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Full name is required.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-bold text-dark mb-2">Email Address <span
+                                            class="text-gray-400 font-normal">(Optional)</span></label>
+                                    <input type="email" id="f-email"
+                                        class="w-full px-5 py-3 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white transition-all text-lg"
+                                        placeholder="For receipt copy">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 2: Outlet -->
+                        <div class="border-t border-light pt-12 scroll-mt-32" id="sec-outlet">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-dark text-white flex items-center justify-center font-bold text-sm shadow-md">
+                                    2</div>
                                 <h2 class="text-2xl font-bold text-dark">Choose Outlet</h2>
                             </div>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <?php 
+                            $bCount = count($active_branches);
+                            if ($bCount === 1) {
+                                $gridCols = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3';
+                            } elseif ($bCount === 2) {
+                                $gridCols = 'grid-cols-1 sm:grid-cols-2';
+                            } elseif ($bCount === 3) {
+                                $gridCols = 'grid-cols-1 sm:grid-cols-3';
+                            } else {
+                                $gridCols = 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4';
+                            }
+                            ?>
+                            <div class="grid <?php echo $gridCols; ?> gap-4">
+                                <?php foreach ($active_branches as $index => $branch): 
+                                    $branchName = htmlspecialchars($branch['branch_name']);
+                                    $isActive = ($index === 0) ? 'border-primary bg-primary/5 text-primary' : 'border-light text-gray-500 hover:border-primary/50 hover:bg-gray-50';
+                                ?>
                                 <button type="button"
-                                    class="outlet-btn border-2 border-primary bg-primary/5 text-primary font-bold py-4 px-4 rounded-xl transition-all shadow-sm"
-                                    data-outlet="Little India">Little India</button>
-                                <button type="button"
-                                    class="outlet-btn border-2 border-light text-gray-500 font-bold py-4 px-4 rounded-xl transition-all hover:border-primary/50 hover:bg-gray-50"
-                                    data-outlet="Orchard">Orchard</button>
-                                <button type="button"
-                                    class="outlet-btn border-2 border-light text-gray-500 font-bold py-4 px-4 rounded-xl transition-all hover:border-primary/50 hover:bg-gray-50"
-                                    data-outlet="Serangoon">Serangoon</button>
-                                <button type="button"
-                                    class="outlet-btn border-2 border-light text-gray-500 font-bold py-4 px-4 rounded-xl transition-all hover:border-primary/50 hover:bg-gray-50"
-                                    data-outlet="Holland V">Holland V.</button>
+                                    class="outlet-btn border-2 font-bold py-4 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center text-center <?php echo $isActive; ?>"
+                                    data-outlet="<?php echo $branchName; ?>" data-branchid="<?php echo $branch['branch_id']; ?>"><?php echo $branchName; ?></button>
+                                <?php endforeach; ?>
                             </div>
                             <!-- Inline Error -->
                             <p class="hidden text-error text-sm font-bold mt-3 err-msg" id="err-outlet">
@@ -217,30 +391,6 @@
                                         d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Please choose an outlet.
-                            </p>
-                        </div>
-
-                        <!-- Section 2: Date -->
-                        <div class="border-t border-light pt-12 scroll-mt-32" id="sec-date">
-                            <div class="flex items-center gap-3 mb-6">
-                                <div
-                                    class="w-8 h-8 rounded-full bg-dark text-white flex items-center justify-center font-bold text-sm shadow-md">
-                                    2</div>
-                                <h2 class="text-2xl font-bold text-dark">Select Date</h2>
-                            </div>
-
-                            <div class="grid grid-cols-4 md:grid-cols-8 gap-2 sm:gap-3" id="date-grid">
-                                <!-- Populated via JS -->
-                            </div>
-
-
-                            <p class="hidden text-error text-sm font-bold mt-3 err-msg" id="err-date">
-                                <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Please select a valid date from the calendar.
                             </p>
                         </div>
 
@@ -270,224 +420,72 @@
 
                             <!-- Category Pills (Horizontal Scroll) -->
                             <div class="flex overflow-x-auto no-scrollbar gap-2 mb-6 pb-2" id="category-pills">
+                                <?php foreach ($service_categories as $cIndex => $cat): ?>
                                 <button type="button"
-                                    class="cat-pill whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold bg-primary text-white border border-transparent shadow-sm transition-colors"
-                                    data-target="all">All</button>
-                                <button type="button"
-                                    class="cat-pill whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold bg-white text-gray-600 border border-light hover:border-primary/50 transition-colors"
-                                    data-target="cat-threading">Threading</button>
-                                <button type="button"
-                                    class="cat-pill whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold bg-white text-gray-600 border border-light hover:border-primary/50 transition-colors"
-                                    data-target="cat-facial">Facial Treatments</button>
-                                <button type="button"
-                                    class="cat-pill whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold bg-white text-gray-600 border border-light hover:border-primary/50 transition-colors"
-                                    data-target="cat-waxing">Waxing</button>
-                                <button type="button"
-                                    class="cat-pill whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold bg-white text-gray-600 border border-light hover:border-primary/50 transition-colors"
-                                    data-target="cat-hair">Hair Care</button>
-                                <button type="button"
-                                    class="cat-pill whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold bg-white text-gray-600 border border-light hover:border-primary/50 transition-colors"
-                                    data-target="cat-massage">Massage</button>
+                                    class="cat-pill whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold <?php echo $cIndex === 0 ? 'bg-primary text-white border-transparent' : 'bg-white text-gray-600 border-light hover:border-primary/50'; ?> transition-colors"
+                                    data-target="cat-<?php echo htmlspecialchars($cat['catid']); ?>"><?php echo htmlspecialchars($cat['cattitle']); ?></button>
+                                <?php endforeach; ?>
                             </div>
 
-                            <div
-                                class="mb-6 bg-lavender p-5 rounded-xl border border-light flex justify-between items-center shadow-sm">
-                                <p class="text-base text-dark font-bold">Total Service Duration:</p>
-                                <p class="text-lg font-black text-primary" id="total-duration-lbl">0 mins</p>
-                            </div>
 
                             <div class="space-y-4" id="services-container">
-                                <!-- Category: Threading -->
-                                <div class="service-category border border-light rounded-xl overflow-hidden shadow-sm bg-white"
-                                    id="cat-threading">
+                                <?php foreach ($service_categories as $cIndex => $cat): 
+                                    $isFirst = ($cIndex === 0);
+                                ?>
+                                <div class="service-category border border-light rounded-xl overflow-hidden shadow-sm bg-white <?php echo $isFirst ? '' : 'hidden'; ?>"
+                                    id="cat-<?php echo htmlspecialchars($cat['catid']); ?>">
                                     <button type="button"
                                         class="category-toggle w-full flex justify-between items-center px-5 py-4 font-bold text-dark hover:bg-gray-50 transition-colors focus:outline-none">
-                                        <span class="text-lg">Threading</span>
-                                        <svg class="w-5 h-5 transform transition-transform duration-200 chevron rotate-180"
+                                        <span class="text-lg"><?php echo htmlspecialchars($cat['cattitle']); ?></span>
+                                        <svg class="w-5 h-5 transform transition-transform duration-200 chevron <?php echo $isFirst ? 'rotate-180' : ''; ?>"
                                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M19 9l-7 7-7-7" />
                                         </svg>
                                     </button>
-                                    <div class="divide-y divide-light category-content border-t border-light">
+                                    <div class="divide-y divide-light category-content border-t border-light <?php echo $isFirst ? '' : 'hidden'; ?>">
+                                        <?php 
+                                        $sCount = 0;
+                                        foreach ($cat['services'] as $service): 
+                                            $sCount++;
+                                            $sName = htmlspecialchars($service['prdt_name']);
+                                            $sPrice = number_format((float)$service['prdt_final_price'], 2);
+                                            $sDuration = (int)preg_replace('/\D/', '', $service['prdt_service_time'] ?: '0');
+                                            if ($sDuration === 0) $sDuration = 30; // fallback duration
+                                            $hiddenClass = ($sCount > 5) ? 'hidden extra-service' : '';
+                                        ?>
                                         <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
+                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors <?php echo $hiddenClass; ?>">
                                             <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Eyebrow Threading
-                                                </h4>
-                                                <p class="text-sm text-gray-500 mt-1">15 mins • $8.00</p>
+                                                <h4 class="font-bold text-dark text-base service-name"><?php echo $sName; ?></h4>
+                                                <p class="text-sm text-gray-500 mt-1"><?php echo $sDuration; ?> mins • $<?php echo $sPrice; ?></p>
                                             </div>
                                             <button type="button"
                                                 class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s1" data-name="Eyebrow Threading" data-price="8"
-                                                data-duration="15">+ Add</button>
+                                                data-id="s<?php echo $service['prdt_id']; ?>" data-name="<?php echo $sName; ?>" data-price="<?php echo $service['prdt_final_price']; ?>"
+                                                data-duration="<?php echo $sDuration; ?>">+ Add</button>
                                         </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Upper Lip
-                                                    Threading</h4>
-                                                <p class="text-sm text-gray-500 mt-1">10 mins • $5.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s2" data-name="Upper Lip Threading" data-price="5"
-                                                data-duration="10">+ Add</button>
+                                        <?php endforeach; ?>
+                                        
+                                        <?php if ($sCount > 5): ?>
+                                        <div class="p-4 flex justify-center border-t border-light show-more-container bg-white">
+                                            <button type="button" class="btn-show-more px-6 py-2 rounded-full border border-primary text-primary font-bold text-sm hover:bg-primary hover:text-white transition-colors">
+                                                Show More (<span class="remaining-count"><?php echo $sCount - 5; ?></span>)
+                                            </button>
                                         </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Lower Lip & Chin
-                                                    Threading</h4>
-                                                <p class="text-sm text-gray-500 mt-1">15 mins • $10.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s2a" data-name="Lower Lip & Chin Threading" data-price="10"
-                                                data-duration="15">+ Add</button>
-                                        </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Forehead
-                                                    Threading</h4>
-                                                <p class="text-sm text-gray-500 mt-1">10 mins • $6.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s2b" data-name="Forehead Threading" data-price="6"
-                                                data-duration="10">+ Add</button>
-                                        </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Full Face
-                                                    Threading</h4>
-                                                <p class="text-sm text-gray-500 mt-1">30 mins • $25.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s2c" data-name="Full Face Threading" data-price="25"
-                                                data-duration="30">+ Add</button>
-                                        </div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
+                                <?php endforeach; ?>
+                            </div>
 
-                                <!-- Category: Facial -->
-                                <div class="service-category border border-light rounded-xl overflow-hidden shadow-sm bg-white"
-                                    id="cat-facial">
-                                    <button type="button"
-                                        class="category-toggle w-full flex justify-between items-center px-5 py-4 font-bold text-dark hover:bg-gray-50 transition-colors focus:outline-none">
-                                        <span class="text-lg">Facial Treatments</span>
-                                        <svg class="w-5 h-5 transform transition-transform duration-200 chevron"
-                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-                                    <div class="divide-y divide-light category-content border-t border-light hidden">
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Herbal Glow
-                                                    Facial</h4>
-                                                <p class="text-sm text-gray-500 mt-1">60 mins • $65.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s3" data-name="Herbal Glow Facial" data-price="65"
-                                                data-duration="60">+ Add</button>
-                                        </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Anti-Aging
-                                                    Premium</h4>
-                                                <p class="text-sm text-gray-500 mt-1">90 mins • $95.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s4" data-name="Anti-Aging Premium" data-price="95"
-                                                data-duration="90">+ Add</button>
-                                        </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Deep Cleansing
-                                                    Facial</h4>
-                                                <p class="text-sm text-gray-500 mt-1">45 mins • $50.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s4a" data-name="Deep Cleansing Facial" data-price="50"
-                                                data-duration="45">+ Add</button>
-                                        </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Brightening
-                                                    Diamond Facial</h4>
-                                                <p class="text-sm text-gray-500 mt-1">75 mins • $120.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s4b" data-name="Brightening Diamond Facial" data-price="120"
-                                                data-duration="75">+ Add</button>
-                                        </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Acne Clarifying
-                                                    Treatment</h4>
-                                                <p class="text-sm text-gray-500 mt-1">60 mins • $75.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s4c" data-name="Acne Clarifying Treatment" data-price="75"
-                                                data-duration="60">+ Add</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Category: Waxing (Demo for Pills) -->
-                                <div class="service-category border border-light rounded-xl overflow-hidden shadow-sm bg-white"
-                                    id="cat-waxing">
-                                    <button type="button"
-                                        class="category-toggle w-full flex justify-between items-center px-5 py-4 font-bold text-dark hover:bg-gray-50 transition-colors focus:outline-none">
-                                        <span class="text-lg">Waxing</span>
-                                        <svg class="w-5 h-5 transform transition-transform duration-200 chevron"
-                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-                                    <div class="divide-y divide-light category-content border-t border-light hidden">
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Full Arms Waxing
-                                                </h4>
-                                                <p class="text-sm text-gray-500 mt-1">30 mins • $25.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s5" data-name="Full Arms Waxing" data-price="25"
-                                                data-duration="30">+ Add</button>
-                                        </div>
-                                        <div
-                                            class="service-item p-5 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <h4 class="font-bold text-dark text-base service-name">Full Legs Waxing
-                                                </h4>
-                                                <p class="text-sm text-gray-500 mt-1">45 mins • $40.00</p>
-                                            </div>
-                                            <button type="button"
-                                                class="btn-add-service px-5 py-2 text-sm font-bold text-primary bg-white border border-primary rounded-full hover:bg-primary hover:text-white transition-colors w-[100px] text-center flex justify-center items-center"
-                                                data-id="s6" data-name="Full Legs Waxing" data-price="40"
-                                                data-duration="45">+ Add</button>
-                                        </div>
-                                    </div>
-                                </div>
+                            <!-- No Services Found Message -->
+                            <div id="no-services-found" class="hidden text-center py-10 bg-gray-50 rounded-xl border border-dashed border-light">
+                                <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p class="text-gray-500 font-medium">No services found matching your search.</p>
+                                <button type="button" class="mt-3 text-primary font-bold text-sm hover:underline" onclick="$('#service-search').val('').trigger('keyup')">Clear Search</button>
                             </div>
 
                             <!-- Inline Error -->
@@ -501,12 +499,35 @@
                             </p>
                         </div>
 
-                        <!-- Section 4: Therapist -->
-                        <div class="border-t border-light pt-12 scroll-mt-32" id="sec-therapist">
+                        <!-- Section 4: Date -->
+                        <div class="border-t border-light pt-12 scroll-mt-32" id="sec-date">
                             <div class="flex items-center gap-3 mb-6">
                                 <div
                                     class="w-8 h-8 rounded-full bg-dark text-white flex items-center justify-center font-bold text-sm shadow-md">
                                     4</div>
+                                <h2 class="text-2xl font-bold text-dark">Select Date</h2>
+                            </div>
+
+                            <div class="grid grid-cols-4 md:grid-cols-8 gap-2 sm:gap-3" id="date-grid">
+                                <!-- Populated via JS -->
+                            </div>
+
+                            <p class="hidden text-error text-sm font-bold mt-3 err-msg" id="err-date">
+                                <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Please select a valid date from the calendar.
+                            </p>
+                        </div>
+
+                        <!-- Section 5: Therapist -->
+                        <div class="border-t border-light pt-12 scroll-mt-32" id="sec-therapist">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-dark text-white flex items-center justify-center font-bold text-sm shadow-md">
+                                    5</div>
                                 <h2 class="text-2xl font-bold text-dark">Choose Therapist</h2>
                             </div>
                             <div class="grid grid-cols-3 sm:grid-cols-4 gap-4" id="therapist-grid">
@@ -514,12 +535,12 @@
                             </div>
                         </div>
 
-                        <!-- Section 5: Time Slots -->
+                        <!-- Section 6: Time Slots -->
                         <div class="border-t border-light pt-12 scroll-mt-32" id="sec-time">
                             <div class="flex items-center gap-3 mb-6">
                                 <div
                                     class="w-8 h-8 rounded-full bg-dark text-white flex items-center justify-center font-bold text-sm shadow-md">
-                                    5</div>
+                                    6</div>
                                 <h2 class="text-2xl font-bold text-dark">Select Time Slot</h2>
                             </div>
 
@@ -538,64 +559,16 @@
                             </p>
                         </div>
 
-                        <!-- Section 6: Details & Payment -->
+                        <!-- Section 7: Details & Payment -->
                         <div class="border-t border-light pt-12 scroll-mt-32" id="sec-details">
                             <div class="flex items-center gap-3 mb-8">
                                 <div
                                     class="w-8 h-8 rounded-full bg-dark text-white flex items-center justify-center font-bold text-sm shadow-md">
-                                    6</div>
+                                    7</div>
                                 <h2 class="text-2xl font-bold text-dark">Your Details</h2>
                             </div>
 
-                            <div class="space-y-6 mb-10">
-                                <div>
-                                    <label class="block text-sm font-bold text-dark mb-2">Full Name <span
-                                            class="text-error">*</span></label>
-                                    <input type="text" id="f-name"
-                                        class="w-full px-5 py-4 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50 transition-all text-lg"
-                                        placeholder="e.g. Amanda Tan">
-                                    <p class="hidden text-error text-sm font-bold mt-2 err-msg" id="err-name">
-                                        <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        Full name is required.
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-bold text-dark mb-2">Mobile Number <span
-                                            class="text-error">*</span></label>
-                                    <div class="flex shadow-sm rounded-xl">
-                                        <select id="f-cc"
-                                            class="px-3 sm:px-5 py-4 rounded-l-xl border border-r-0 border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50 text-gray-700 font-bold text-lg">
-                                            <option value="+65">🇸🇬 +65</option>
-                                            <option value="+60">🇲🇾 +60</option>
-                                        </select>
-                                        <input type="tel" id="f-mobile"
-                                            class="w-full px-5 py-4 rounded-r-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50 transition-all text-lg"
-                                            placeholder="9123 4567" maxlength="8">
-                                    </div>
-                                    <p class="hidden text-error text-sm font-bold mt-2 err-msg" id="err-mobile">
-                                        <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        Mobile number is required.
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-bold text-dark mb-2">Email Address <span
-                                            class="text-gray-400 font-normal">(Optional)</span></label>
-                                    <input type="email" id="f-email"
-                                        class="w-full px-5 py-4 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50 transition-all text-lg"
-                                        placeholder="For receipt copy">
-                                </div>
-                            </div>
-
+                            <!-- Name and Email moved to Section 1 -->
                             <div class="mb-4">
                                 <label
                                     class="block text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Payment
@@ -703,11 +676,41 @@
                         </div>
                     </div>
 
+                    <!-- Coupon Code Section -->
+                    <div class="border-t border-dashed border-gray-300 pt-6 mb-6">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Promo / Coupon Code</h4>
+                        
+                        <!-- Input Group -->
+                        <div id="promoInputGroup" class="flex gap-2">
+                            <input type="text" id="couponCodeInput" value="<?php echo $promo_code; ?>" placeholder="Enter code" class="w-full px-4 py-3 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50 transition-all font-bold uppercase placeholder:normal-case placeholder:font-normal">
+                            <button type="button" id="applyCouponBtn" class="bg-dark text-white px-5 py-3 rounded-xl font-bold hover:bg-primary transition-colors disabled:opacity-50">Apply</button>
+                        </div>
+                        
+                        <!-- Applied State -->
+                        <div id="appliedCouponState" class="hidden items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
+                            <div class="flex items-center gap-2 text-success">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span id="appliedCouponLabel" class="font-bold text-sm"></span>
+                            </div>
+                            <button type="button" id="removeCouponBtn" class="text-error hover:text-red-700 p-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <div id="couponMessage" class="mt-2 text-sm"></div>
+                    </div>
+
                     <div class="border-t border-dashed border-gray-300 pt-6 mb-8">
                         <div class="flex justify-between items-center mb-3">
                             <span class="text-sm font-medium text-gray-500">Total Duration</span>
                             <span class="font-bold text-dark text-base" id="summary-duration">0 mins</span>
                         </div>
+                        
+                        <!-- Discount Row (Hidden by default) -->
+                        <div id="summary-discount-row" class="hidden flex justify-between items-center mb-3 text-success">
+                            <span class="text-sm font-medium">Discount Applied</span>
+                            <span class="font-bold text-base" id="summary-discount-val">-$0.00</span>
+                        </div>
+                        
                         <div class="flex justify-between items-end mt-4">
                             <span class="text-sm font-bold text-dark uppercase tracking-wider mb-1">Total Amount</span>
                             <span class="text-4xl font-black text-primary tracking-tighter"
@@ -741,10 +744,15 @@
             <p class="text-lg text-gray-600 mb-8 max-w-md mx-auto">We've sent a confirmation SMS with your booking
                 details. We look forward to pampering you.</p>
 
-            <div class="bg-[#faf7fc] px-6 py-8 rounded-2xl border border-light mb-8 w-full shadow-inner text-left">
+            <div id="success-loading-card" class="bg-[#faf7fc] px-6 py-12 rounded-2xl border border-light mb-8 w-full shadow-inner text-center hidden">
+                <div class="inline-block animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
+                <p class="text-gray-500 font-bold">Verifying payment status...</p>
+            </div>
+
+            <div id="success-details-card" class="bg-[#faf7fc] px-6 py-8 rounded-2xl border border-light mb-8 w-full shadow-inner text-left">
                 <div class="text-center mb-6">
-                    <p class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-1">Booking ID</p>
-                    <p class="text-3xl font-black text-primary">#RPS-88291</p>
+                    <p class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-1">Booking Reference</p>
+                    <p class="text-3xl font-black text-primary" id="success-booking-id">#RPS-88291</p>
                 </div>
 
                 <div class="border-t border-dashed border-gray-300 pt-6 mt-6">
@@ -762,6 +770,12 @@
                         <div class="flex justify-between items-center"><span
                                 class="text-gray-500 font-medium">Therapist</span><span
                                 class="font-bold text-dark text-right" id="success-therapist">-</span></div>
+                        <div class="flex justify-between items-center"><span
+                                class="text-gray-500 font-medium">Payment Mode</span><span
+                                class="font-bold text-dark text-right" id="success-payment-mode">-</span></div>
+                        <div class="flex justify-between items-center"><span
+                                class="text-gray-500 font-medium">Payment Status</span><span
+                                class="font-bold text-right" id="success-payment-status">-</span></div>
                     </div>
                 </div>
 
@@ -777,14 +791,18 @@
                         <span class="text-sm font-medium text-gray-500">Total Duration</span>
                         <span class="font-bold text-dark text-base" id="success-duration">0 mins</span>
                     </div>
+                    <div class="flex justify-between items-center mb-3 hidden" id="success-discount-row">
+                        <span class="text-sm font-medium text-gray-500">Discount Applied</span>
+                        <span class="font-bold text-success text-base" id="success-discount-val">-$0.00</span>
+                    </div>
                     <div class="flex justify-between items-end mt-4">
-                        <span class="text-sm font-bold text-dark uppercase tracking-wider mb-1">Total Paid</span>
+                        <span class="text-sm font-bold text-dark uppercase tracking-wider mb-1" id="success-total-label">Total Paid</span>
                         <span class="text-4xl font-black text-primary tracking-tighter" id="success-total">$0.00</span>
                     </div>
                 </div>
             </div>
 
-            <button onclick="location.reload()"
+            <button onclick="window.location.href='book.php'"
                 class="font-bold text-primary border-b-2 border-primary pb-1 hover:text-dark hover:border-dark transition-colors text-lg">Book
                 Another Appointment</button>
         </div>
@@ -793,6 +811,7 @@
     <?php include 'includes/footer.php'; ?>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="assets/js/main.js?v=<?php echo time(); ?>"></script>
 </body>
 

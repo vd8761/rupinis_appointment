@@ -67,191 +67,110 @@
         </div>
     </section>
 
-    <!-- Services Grid Section -->
+    <?php
+    $fav_categories = [];
+    $services = [];
+    try {
+        $stmt_cat = $pdo->prepare("SELECT cattitle FROM oc_product_cat WHERE favourite_status = 1 AND status = 1 ORDER BY IF(catorder > 0, 0, 1) ASC, catorder ASC, cattitle ASC");
+        $stmt_cat->execute();
+        $fav_categories = $stmt_cat->fetchAll();
+
+        // Fetch services/products that belong to favorite categories
+        $stmt_srv = $pdo->prepare("
+            SELECT p.prdt_id, p.prdt_name, p.prdt_description, p.prdt_service_time, p.prdt_final_price, p.prd_image, c.cattitle 
+            FROM oc_product p 
+            INNER JOIN oc_product_cat c ON p.catid = c.catid 
+            WHERE p.status = 1 AND p.deleted = 0 AND p.prdt_type = 2 AND p.prdt_name NOT LIKE '%Coffee%' AND c.favourite_status = 1 AND c.status = 1
+            ORDER BY IF(c.catorder > 0, 0, 1) ASC, c.catorder ASC, c.cattitle ASC, p.prdt_name ASC
+        ");
+        $stmt_srv->execute();
+        $services = $stmt_srv->fetchAll();
+    } catch (\PDOException $e) {
+        // Handle gracefully
+    }
+    ?>
     <section class="py-16 flex-grow">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
             <!-- Categories / Tabs -->
-            <div class="flex flex-wrap justify-center gap-4 mb-16">
-                <button
-                    class="px-6 py-2.5 rounded-full bg-primary text-white font-bold shadow-md hover:bg-dark transition-colors">All
-                    Services</button>
-                <button
-                    class="px-6 py-2.5 rounded-full bg-white text-gray-600 font-bold shadow-sm border border-light hover:bg-primary hover:text-white transition-colors">Facials</button>
-                <button
-                    class="px-6 py-2.5 rounded-full bg-white text-gray-600 font-bold shadow-sm border border-light hover:bg-primary hover:text-white transition-colors">Body
-                    Massage</button>
-                <button
-                    class="px-6 py-2.5 rounded-full bg-white text-gray-600 font-bold shadow-sm border border-light hover:bg-primary hover:text-white transition-colors">Threading</button>
+            <div class="flex flex-wrap justify-center gap-4 mb-16" id="filter-buttons">
+                <button data-filter="all" class="filter-btn active px-6 py-2.5 rounded-full bg-primary text-white font-bold shadow-md transition-colors">All Services</button>
+                <?php foreach ($fav_categories as $cat): ?>
+                    <button data-filter="<?php echo htmlspecialchars($cat['cattitle']); ?>" class="filter-btn px-6 py-2.5 rounded-full bg-white text-gray-600 font-bold shadow-sm border border-light hover:bg-primary hover:text-white transition-colors">
+                        <?php echo htmlspecialchars($cat['cattitle']); ?>
+                    </button>
+                <?php endforeach; ?>
             </div>
 
             <!-- Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-
-                <!-- Card 1 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-white border border-light/50 hover:shadow-xl transition-all duration-300 flex flex-col">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" id="services-grid">
+                <?php foreach ($services as $service): 
+                    $cat_name = $service['cattitle'] ? htmlspecialchars($service['cattitle']) : 'Uncategorized';
+                    
+                    // Determine image (use placeholder if not set)
+                    $img_src = !empty($service['prd_image']) ? 'uploads/services/' . htmlspecialchars($service['prd_image']) : 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?q=80&w=2070&auto=format&fit=crop';
+                    
+                    // Format Price
+                    $price = number_format((float)$service['prdt_final_price'], 2);
+                    
+                    // Format duration
+                    $duration = !empty($service['prdt_service_time']) ? htmlspecialchars($service['prdt_service_time']) . ' min' : 'Varies';
+                    
+                    // Format description
+                    $description = !empty($service['prdt_description']) ? htmlspecialchars($service['prdt_description']) : 'Experience our premium ' . htmlspecialchars($service['prdt_name']) . '.';
+                ?>
+                <div data-category="<?php echo $cat_name; ?>" class="service-card group rounded-3xl overflow-hidden bg-white border border-light/50 hover:shadow-xl transition-all duration-300 flex flex-col">
                     <div class="h-60 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?q=80&w=2070&auto=format&fit=crop"
-                            alt="Signature Facial"
-                            class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
-                        <div
-                            class="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary">
-                            Facials</div>
+                        <img src="<?php echo $img_src; ?>" alt="<?php echo htmlspecialchars($service['prdt_name']); ?>" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
+                        <div class="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary"><?php echo $cat_name; ?></div>
                     </div>
                     <div class="p-8 flex-grow flex flex-col">
-                        <h3 class="text-2xl font-bold text-dark mb-2">Signature Glowing Facial</h3>
-                        <p class="text-gray-500 mb-6 flex-grow">A deeply hydrating and cleansing facial tailored to your
-                            specific skin type. Restores natural radiance using premium organic products.</p>
+                        <h3 class="text-2xl font-bold text-dark mb-2"><?php echo htmlspecialchars($service['prdt_name']); ?></h3>
+                        <p class="text-gray-500 mb-6 flex-grow line-clamp-3"><?php echo $description; ?></p>
                         <div class="flex items-center justify-between pt-4 border-t border-light/50">
                             <div>
-                                <span class="block text-sm text-gray-400">Duration: 60 min</span>
-                                <span class="text-xl font-black text-primary">$85.00</span>
+                                <span class="block text-sm text-gray-400">Duration: <?php echo $duration; ?></span>
+                                <span class="text-xl font-black text-primary">$<?php echo $price; ?></span>
                             </div>
-                            <a href="book.php"
-                                class="px-5 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary hover:text-white transition-colors">Book
-                                Now</a>
+                            <a href="book.php?service_id=<?php echo $service['prdt_id']; ?>" class="px-5 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary hover:text-white transition-colors">Book Now</a>
                         </div>
                     </div>
                 </div>
-
-                <!-- Card 2 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-white border border-light/50 hover:shadow-xl transition-all duration-300 flex flex-col">
-                    <div class="h-60 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop"
-                            alt="Aromatherapy Massage"
-                            class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
-                        <div
-                            class="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary">
-                            Massage</div>
-                    </div>
-                    <div class="p-8 flex-grow flex flex-col">
-                        <h3 class="text-2xl font-bold text-dark mb-2">Aromatherapy Massage</h3>
-                        <p class="text-gray-500 mb-6 flex-grow">Melt away stress with a full-body massage utilizing
-                            custom-blended essential oils for deep relaxation and muscle tension relief.</p>
-                        <div class="flex items-center justify-between pt-4 border-t border-light/50">
-                            <div>
-                                <span class="block text-sm text-gray-400">Duration: 90 min</span>
-                                <span class="text-xl font-black text-primary">$120.00</span>
-                            </div>
-                            <a href="book.php"
-                                class="px-5 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary hover:text-white transition-colors">Book
-                                Now</a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card 3 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-white border border-light/50 hover:shadow-xl transition-all duration-300 flex flex-col">
-                    <div class="h-60 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?q=80&w=2070&auto=format&fit=crop"
-                            alt="Precision Threading"
-                            class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
-                        <div
-                            class="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary">
-                            Threading</div>
-                    </div>
-                    <div class="p-8 flex-grow flex flex-col">
-                        <h3 class="text-2xl font-bold text-dark mb-2">Precision Eyebrow Threading</h3>
-                        <p class="text-gray-500 mb-6 flex-grow">Expert eyebrow shaping using traditional threading
-                            techniques for perfectly defined, lasting results with minimal irritation.</p>
-                        <div class="flex items-center justify-between pt-4 border-t border-light/50">
-                            <div>
-                                <span class="block text-sm text-gray-400">Duration: 15 min</span>
-                                <span class="text-xl font-black text-primary">$15.00</span>
-                            </div>
-                            <a href="book.php"
-                                class="px-5 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary hover:text-white transition-colors">Book
-                                Now</a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card 4 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-white border border-light/50 hover:shadow-xl transition-all duration-300 flex flex-col">
-                    <div class="h-60 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=2070&auto=format&fit=crop"
-                            alt="Anti-Aging Facial"
-                            class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
-                        <div
-                            class="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary">
-                            Facials</div>
-                    </div>
-                    <div class="p-8 flex-grow flex flex-col">
-                        <h3 class="text-2xl font-bold text-dark mb-2">Anti-Aging Gold Facial</h3>
-                        <p class="text-gray-500 mb-6 flex-grow">A luxurious treatment using 24k gold infused serums to
-                            improve skin elasticity, reduce fine lines, and impart a luminous glow.</p>
-                        <div class="flex items-center justify-between pt-4 border-t border-light/50">
-                            <div>
-                                <span class="block text-sm text-gray-400">Duration: 75 min</span>
-                                <span class="text-xl font-black text-primary">$150.00</span>
-                            </div>
-                            <a href="book.php"
-                                class="px-5 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary hover:text-white transition-colors">Book
-                                Now</a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card 5 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-white border border-light/50 hover:shadow-xl transition-all duration-300 flex flex-col">
-                    <div class="h-60 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1519823551278-64ac92734fb1?q=80&w=2070&auto=format&fit=crop"
-                            alt="Deep Tissue Massage"
-                            class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
-                        <div
-                            class="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary">
-                            Massage</div>
-                    </div>
-                    <div class="p-8 flex-grow flex flex-col">
-                        <h3 class="text-2xl font-bold text-dark mb-2">Deep Tissue Massage</h3>
-                        <p class="text-gray-500 mb-6 flex-grow">Targeted firm pressure massage to relieve chronic muscle
-                            tension, perfect for active lifestyles and deep stress relief.</p>
-                        <div class="flex items-center justify-between pt-4 border-t border-light/50">
-                            <div>
-                                <span class="block text-sm text-gray-400">Duration: 60 min</span>
-                                <span class="text-xl font-black text-primary">$110.00</span>
-                            </div>
-                            <a href="book.php"
-                                class="px-5 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary hover:text-white transition-colors">Book
-                                Now</a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card 6 -->
-                <div
-                    class="group rounded-3xl overflow-hidden bg-white border border-light/50 hover:shadow-xl transition-all duration-300 flex flex-col">
-                    <div class="h-60 overflow-hidden relative">
-                        <img src="https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?q=80&w=2070&auto=format&fit=crop"
-                            alt="Bridal Package"
-                            class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
-                        <div
-                            class="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary">
-                            Packages</div>
-                    </div>
-                    <div class="p-8 flex-grow flex flex-col">
-                        <h3 class="text-2xl font-bold text-dark mb-2">Bridal Radiance Package</h3>
-                        <p class="text-gray-500 mb-6 flex-grow">The ultimate pre-wedding pampering session. Includes our
-                            Signature Facial, full body polish, and express threading.</p>
-                        <div class="flex items-center justify-between pt-4 border-t border-light/50">
-                            <div>
-                                <span class="block text-sm text-gray-400">Duration: 180 min</span>
-                                <span class="text-xl font-black text-primary">$280.00</span>
-                            </div>
-                            <a href="book.php"
-                                class="px-5 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary hover:text-white transition-colors">Book
-                                Now</a>
-                        </div>
-                    </div>
-                </div>
-
+                <?php endforeach; ?>
             </div>
         </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const buttons = document.querySelectorAll('.filter-btn');
+                const cards = document.querySelectorAll('.service-card');
+
+                buttons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        // Remove active styling from all buttons
+                        buttons.forEach(b => {
+                            b.classList.remove('bg-primary', 'text-white');
+                            b.classList.add('bg-white', 'text-gray-600');
+                        });
+
+                        // Add active styling to clicked button
+                        btn.classList.remove('bg-white', 'text-gray-600');
+                        btn.classList.add('bg-primary', 'text-white');
+
+                        const filter = btn.getAttribute('data-filter');
+
+                        // Show/Hide cards based on filter
+                        cards.forEach(card => {
+                            if (filter === 'all' || card.getAttribute('data-category') === filter) {
+                                card.style.display = 'flex';
+                            } else {
+                                card.style.display = 'none';
+                            }
+                        });
+                    });
+                });
+            });
+        </script>
     </section>
 
     <!-- Footer -->
