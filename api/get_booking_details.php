@@ -91,7 +91,7 @@ try {
                 $customer_id = $booking['customers_id'];
                 $price = $booking['price'];
                 $discount_amount = $booking['discount_amount'] ?? 0;
-                $modeofpay = $booking['payment_type'] ?? 5; // 5 for HitPay
+                $modeofpay = 2; // 2 for Online/HitPay
                 $date = date('Y-m-d');
                 $datetime = date('Y-m-d H:i:s');
 

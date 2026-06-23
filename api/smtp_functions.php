@@ -7,7 +7,7 @@ require_once __DIR__ . '/phpmailer_vendor/autoload.php';
 
 function smtpEmailConfig($to, $cc, $send_from, $Bcc, $sender_name, $subject, $body, $attachment = null)
 {
-    $AWS_SMTP_UN = 'app.journeygenie@gmail.com';
+    $AWS_SMTP_UN = $send_from;
     $AWS_SMTP_PWD = getenv('GMAIL_APP_PASSWORD') ?: 'nzptmtdjfzxxbbnw';
     $SMTP_HOST = 'smtp.gmail.com';
     $SMTP_PORT = 587;
@@ -38,7 +38,7 @@ function smtpEmailConfig($to, $cc, $send_from, $Bcc, $sender_name, $subject, $bo
 		$send = $mail->Send();
 		return true;
 	} catch (Exception $e) {
-        error_log("Email not sent. PHPMailer Error: {$mail->ErrorInfo}");
+        file_put_contents(__DIR__ . '/mail_debug.log', date('Y-m-d H:i:s') . " Email not sent. PHPMailer Error: {$mail->ErrorInfo}\n", FILE_APPEND);
         return false;
 	}
 }
