@@ -81,7 +81,7 @@
             FROM oc_product p 
             INNER JOIN oc_product_cat c ON p.catid = c.catid 
             WHERE p.status = 1 AND p.deleted = 0 AND p.prdt_type = 2 AND p.prdt_name NOT LIKE '%Coffee%' AND c.favourite_status = 1 AND c.status = 1
-            ORDER BY IF(c.catorder > 0, 0, 1) ASC, c.catorder ASC, c.cattitle ASC, p.prdt_name ASC
+            ORDER BY IF(c.catorder > 0, 0, 1) ASC, c.catorder ASC, c.cattitle ASC, IF(p.prdt_package_orderno > 0, 0, 1) ASC, p.prdt_package_orderno ASC
         ");
         $stmt_srv->execute();
         $services = $stmt_srv->fetchAll();
