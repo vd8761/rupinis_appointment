@@ -1,3 +1,4 @@
+<?php require_once 'includes/env.php'; ?>
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
@@ -17,6 +18,8 @@
     <meta property="og:image" content="assets/images/logo-dark.png">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <!-- Cloudflare Turnstile -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -105,12 +108,13 @@
                         </div>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
+                            <div class="relative">
                                 <label for="phone" class="block text-sm font-bold text-dark mb-2">Phone Number</label>
-                                <div class="w-full">
-                                    <input type="tel" id="phone" name="phone" class="w-full px-4 py-3 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all bg-gray-50" placeholder="9123 4567">
+                                <div class="w-full relative">
+                                    <input type="tel" id="phone" name="phone" class="w-full px-4 py-3 pr-14 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all bg-gray-50" placeholder="9123 4567">
+                                    <span id="phone-counter" class="text-xs font-semibold text-gray-400 absolute right-4 top-[14px] z-10 pointer-events-none">0/8</span>
                                 </div>
-                                <p class="text-red-500 text-xs font-bold mt-1 hidden err-msg" id="err-phone">Phone number is required.</p>
+                                <p class="text-red-500 text-xs font-bold mt-1 hidden err-msg" id="err-phone">Valid phone number is required.</p>
                             </div>
                             
                             <!-- Add intl-tel-input CSS & JS for real flags -->
@@ -128,12 +132,78 @@
                             <script>
                                 document.addEventListener("DOMContentLoaded", function() {
                                     var input = document.querySelector("#phone");
+                                    var counter = document.querySelector("#phone-counter");
                                     window.iti = window.intlTelInput(input, {
                                         initialCountry: "sg",
                                         preferredCountries: ["sg", "my", "id", "in"],
                                         separateDialCode: true,
                                         utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
                                     });
+
+                                    var updatePhoneConstraints = function() {
+                                        // Wait for utils to load if not ready
+                                        if (!window.intlTelInputUtils) {
+                                            setTimeout(updatePhoneConstraints, 100);
+                                            return;
+                                        }
+                                        
+                                        var countryData = window.iti.getSelectedCountryData();
+                                        var maxLen = 15; // default fallback
+                                        
+                                        if (countryData) {
+                                            // Get the exact example number format for this specific country
+                                            var example = window.intlTelInputUtils.getExampleNumber(countryData.iso2, true, window.intlTelInputUtils.numberFormat.NATIONAL);
+                                            if (example) {
+                                                // Special handling for India: users usually omit the '0' trunk prefix for mobile
+                                                if (countryData.iso2 === 'in' && example.startsWith('0')) {
+                                                    example = example.substring(1).trim();
+                                                }
+                                                // Force the placeholder to update instantly
+                                                input.setAttribute("placeholder", example);
+                                                // Count the actual digits required for this country
+                                                maxLen = example.replace(/\D/g, '').length;
+                                            } else {
+                                                // Ultimate fail-safes
+                                                if (countryData.iso2 === 'in') maxLen = 10;
+                                                else if (countryData.iso2 === 'sg') maxLen = 8;
+                                            }
+                                        }
+
+                                        input.setAttribute("maxlength", maxLen);
+                                        updateCounter(maxLen);
+                                    };
+
+                                    var updateCounter = function(maxLen) {
+                                        if (!maxLen) {
+                                            maxLen = parseInt(input.getAttribute("maxlength")) || 15;
+                                        }
+                                        var currentLen = input.value.replace(/\D/g, '').length;
+                                        counter.innerText = currentLen + "/" + maxLen;
+                                        
+                                        if (currentLen > 0 && currentLen < maxLen) {
+                                            counter.classList.add('text-orange-400');
+                                            counter.classList.remove('text-green-500', 'text-gray-400');
+                                        } else if (currentLen === maxLen) {
+                                            counter.classList.add('text-green-500');
+                                            counter.classList.remove('text-orange-400', 'text-gray-400');
+                                        } else {
+                                            counter.classList.add('text-gray-400');
+                                            counter.classList.remove('text-green-500', 'text-orange-400');
+                                        }
+                                    };
+
+                                    input.addEventListener("countrychange", function() {
+                                        input.value = ''; // clear input on country change
+                                        setTimeout(updatePhoneConstraints, 10);
+                                    });
+
+                                    input.addEventListener("input", function() {
+                                        this.value = this.value.replace(/\D/g, ''); // restrict to numbers
+                                        updateCounter();
+                                    });
+
+                                    // Initialize constraints once utils.js is loaded and placeholder is set
+                                    setTimeout(updatePhoneConstraints, 500);
                                 });
                             </script>
                             
@@ -156,6 +226,14 @@
                             <textarea id="message" name="message" rows="4" class="w-full px-4 py-3 rounded-xl border border-light focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all bg-gray-50 resize-none" placeholder="How can we help you today?"></textarea>
                             <p class="text-red-500 text-xs font-bold mt-1 hidden err-msg" id="err-message">Message is required.</p>
                         </div>
+
+                        <!-- Cloudflare Turnstile -->
+                        <?php if (getenv('TURNSTILE_SITE_KEY')): ?>
+                        <div class="flex flex-col mb-2">
+                            <div class="cf-turnstile" data-sitekey="<?= htmlspecialchars(getenv('TURNSTILE_SITE_KEY')) ?>" data-theme="light"></div>
+                            <p class="text-red-500 text-xs font-bold mt-1 hidden err-msg" id="err-turnstile">Please verify that you are human.</p>
+                        </div>
+                        <?php endif; ?>
 
                         <button type="submit" id="btn-contact-submit" class="w-full py-4 bg-primary text-white font-bold rounded-xl hover:bg-dark transition-colors shadow-lg shadow-primary/20 hover:shadow-primary/40 transform hover:-translate-y-0.5">
                             Send Message
@@ -208,10 +286,9 @@
                 }
                 
                 // Validate Phone
-                if (!$('#phone').val().trim()) {
+                if (!window.iti || !window.iti.isValidNumber()) {
                     $('#err-phone').removeClass('hidden');
                     $('#phone').addClass('!border-red-500');
-                    $('#country_code').addClass('!border-red-500');
                     isValid = false;
                 }
                 
@@ -227,6 +304,16 @@
                     $('#err-message').removeClass('hidden');
                     $('#message').addClass('!border-red-500');
                     isValid = false;
+                }
+
+                // Validate Turnstile
+                let turnstileElem = document.querySelector('.cf-turnstile');
+                if (turnstileElem) {
+                    let turnstileResponse = $('[name="cf-turnstile-response"]').val();
+                    if (!turnstileResponse) {
+                        $('#err-turnstile').removeClass('hidden');
+                        isValid = false;
+                    }
                 }
                 
                 if (isValid) {

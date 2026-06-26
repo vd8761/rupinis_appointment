@@ -9,6 +9,40 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// Cloudflare Turnstile Validation
+$turnstile_secret = getenv('TURNSTILE_SECRET_KEY');
+if ($turnstile_secret) {
+    $turnstile_response = $_POST['cf-turnstile-response'] ?? '';
+    if (!$turnstile_response) {
+        echo json_encode(['success' => false, 'message' => 'Please complete the human verification.']);
+        exit;
+    }
+    
+    $verify_url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+    $data = [
+        'secret' => $turnstile_secret,
+        'response' => $turnstile_response,
+        'remoteip' => $_SERVER['REMOTE_ADDR']
+    ];
+    
+    $options = [
+        'http' => [
+            'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+            'method'  => 'POST',
+            'content' => http_build_query($data)
+        ]
+    ];
+    $context  = stream_context_create($options);
+    $result = file_get_contents($verify_url, false, $context);
+    if ($result) {
+        $turnstile_data = json_decode($result, true);
+        if (!$turnstile_data['success']) {
+            echo json_encode(['success' => false, 'message' => 'Human verification failed. Please try again.']);
+            exit;
+        }
+    }
+}
+
 $name = htmlspecialchars($_POST['name'] ?? '');
 $email = htmlspecialchars($_POST['email'] ?? '');
 $country_code = htmlspecialchars($_POST['country_code'] ?? '');
