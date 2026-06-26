@@ -153,7 +153,6 @@
             });
         </script>
 
-
     </section>
 
     <?php if (!empty($active_offers)): ?>

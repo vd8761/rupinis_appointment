@@ -12,7 +12,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $name = htmlspecialchars($_POST['name'] ?? '');
 $email = htmlspecialchars($_POST['email'] ?? '');
 $country_code = htmlspecialchars($_POST['country_code'] ?? '');
+$country_name = htmlspecialchars($_POST['country_name'] ?? '');
 $phone = htmlspecialchars($_POST['phone'] ?? '');
+
+if ($country_name) {
+    $full_phone = trim("$country_name $country_code $phone");
+} else {
+    $full_phone = trim("$country_code $phone");
+}
+
 $service = htmlspecialchars($_POST['service'] ?? '');
 $message = htmlspecialchars($_POST['message'] ?? '');
 
