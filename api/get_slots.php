@@ -265,9 +265,9 @@ if ($booking_beautician <= 0) {
     }
 
     foreach ($start_times as $start_ts) {
-        $end_ts = $start_ts + ($duration_minutes * 60);
-        $new_booking_buffered_end = $end_ts + ($break_minutes * 60);
-        $end_ts = min($limit, $start_ts + ($duration_minutes * 60));
+        $requested_end = $start_ts + ($duration_minutes * 60);
+        $end_ts = min($limit, $requested_end);
+        $new_booking_buffered_end = $requested_end + ($break_minutes * 60);
         
         $available_beautician_ids = [];
         $available_beauticians = 0;
@@ -305,7 +305,9 @@ if ($booking_beautician <= 0) {
             }
         }
 
-        $isBooked = ($available_beauticians < $total_person);
+        $requested_end = $start_ts + ($duration_minutes * 60);
+        $exceeds_limit = ($requested_end > $limit);
+        $isBooked = ($available_beauticians < $total_person) || $exceeds_limit;
 
         $results[] = [
             "label" => date('h:i A', $start_ts) . ' - ' . date('h:i A', $end_ts),
@@ -484,7 +486,8 @@ $slot_duration = $slot_minutes * 60;
     }
 
 foreach ($start_times as $s_start) {
-    $s_end = min($limit, $s_start + ($duration_minutes * 60));
+    $requested_end = $s_start + ($duration_minutes * 60);
+    $s_end = min($limit, $requested_end);
     $new_booking_buffered_end = $s_end + ($break_minutes * 60);
 
     $isBooked = false;
@@ -492,7 +495,7 @@ foreach ($start_times as $s_start) {
     // Check if the entire duration is covered by allowed intervals
     $is_allowed = false;
     foreach ($allowed_intervals as $int) {
-        if ($s_start >= $int['start'] && $s_end <= $int['end']) {
+        if ($s_start >= $int['start'] && $requested_end <= $int['end']) {
             $is_allowed = true;
             break;
         }
@@ -500,18 +503,18 @@ foreach ($start_times as $s_start) {
     if (!$is_allowed) {
         $covered = 0;
         foreach ($allowed_intervals as $int) {
-            if ($int['end'] > $s_start && $int['start'] < $s_end) {
+            if ($int['end'] > $s_start && $int['start'] < $requested_end) {
                 $c_start = max($s_start, $int['start']);
-                $c_end = min($s_end, $int['end']);
+                $c_end = min($requested_end, $int['end']);
                 $covered += ($c_end - $c_start);
             }
         }
-        if ($covered >= ($s_end - $s_start)) {
+        if ($covered >= ($requested_end - $s_start)) {
             $is_allowed = true;
         }
     }
 
-    if (!$is_allowed) {
+    if (!$is_allowed || $requested_end > $limit) {
         $isBooked = true;
     } else {
         foreach ($bookings_list as $b) {
