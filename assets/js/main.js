@@ -44,13 +44,13 @@ $(document).ready(function () {
         let hours = Math.floor(totalMinutes / 60);
         let minutes = totalMinutes % 60;
         let modifier = hours >= 12 ? 'PM' : 'AM';
-        
+
         hours = hours % 12;
         if (hours === 0) hours = 12;
-        
+
         let hoursStr = hours < 10 ? '0' + hours : hours;
         let minutesStr = minutes < 10 ? '0' + minutes : minutes;
-        
+
         return `${hoursStr}:${minutesStr} ${modifier}`;
     }
 
@@ -58,7 +58,7 @@ $(document).ready(function () {
         // Update basic info
         $('#summary-outlet').text(bookingData.outlet || '-');
         $('#summary-date').text(formatDateString(bookingData.date));
-        
+
         if (bookingData.time && totalDuration > 0) {
             let startMins = parseTime(bookingData.time);
             let endMins = startMins + totalDuration;
@@ -66,19 +66,19 @@ $(document).ready(function () {
         } else {
             $('#summary-time').text(bookingData.time || '-');
         }
-        
+
         $('#summary-therapist').text(bookingData.therapist || '-');
 
         // Update totals
         let finalPrice = totalPrice;
         if (window.appliedCouponDiscountVal) {
-             // Basic flat calculation for UI, true calculation is handled by API
-             finalPrice = totalPrice - window.appliedCouponDiscountVal;
-             if (finalPrice < 0) finalPrice = 0;
-             $('#summary-discount-row').removeClass('hidden flex').addClass('flex');
-             $('#summary-discount-val').text('-' + formatCurrency(window.appliedCouponDiscountVal));
+            // Basic flat calculation for UI, true calculation is handled by API
+            finalPrice = totalPrice - window.appliedCouponDiscountVal;
+            if (finalPrice < 0) finalPrice = 0;
+            $('#summary-discount-row').removeClass('hidden flex').addClass('flex');
+            $('#summary-discount-val').text('-' + formatCurrency(window.appliedCouponDiscountVal));
         } else {
-             $('#summary-discount-row').addClass('hidden').removeClass('flex');
+            $('#summary-discount-row').addClass('hidden').removeClass('flex');
         }
         $('#summary-total').text(formatCurrency(finalPrice));
         $('#summary-duration').text(totalDuration > 0 ? totalDuration + ' mins' : '-');
@@ -88,7 +88,7 @@ $(document).ready(function () {
         if (finalPrice < 1) {
             $('input[name="payment"][value="HitPay"]').prop('disabled', true);
             $('input[name="payment"][value="HitPay"]').closest('.payment-label').addClass('opacity-50 cursor-not-allowed pointer-events-none').removeClass('cursor-pointer hover:bg-gray-50 bg-white');
-            
+
             // Switch to Pay at Store if HitPay was selected
             if ($('input[name="payment"]:checked').val() === 'HitPay') {
                 $('input[name="payment"][value="Pay at Store"]').closest('.payment-label').trigger('click');
@@ -103,13 +103,13 @@ $(document).ready(function () {
                 $('input[name="payment"][value="HitPay"]').closest('.payment-label').addClass('cursor-pointer');
             }
         }
-        
+
         // Update services list
         let servicesHtml = '';
-        if(bookingData.services.length > 0) {
+        if (bookingData.services.length > 0) {
             $('#service-count').text(bookingData.services.length + ' Selected');
             $('#service-count').removeClass('bg-primary/10 text-primary').addClass('bg-primary text-white');
-            
+
             bookingData.services.forEach(s => {
                 servicesHtml += `
                 <div class="mb-4 last:mb-0">
@@ -135,38 +135,7 @@ $(document).ready(function () {
 
     function updateTimeSelectionState() {
         if (!bookingData.time) return;
-        
-        let startMins = parseTime(bookingData.time);
-        let endMins = startMins + totalDuration;
-        let isValid = true;
-
-        $('.time-slot').each(function() {
-            let slotMins = parseTime($(this).data('time'));
-            let slotEndMins = slotMins + 30;
-            if (slotMins < endMins && slotEndMins > startMins) {
-                if ($(this).prop('disabled')) {
-                    isValid = false;
-                }
-            }
-        });
-
-        if (!isValid) {
-            clearTimeSelection();
-            $('#err-time').html('<svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Not enough consecutive time available for updated services. Please select a new time.').removeClass('hidden');
-        } else {
-            let cachedTime = bookingData.time;
-            clearTimeSelection();
-            bookingData.time = cachedTime;
-            
-            $('.time-slot').each(function() {
-                let slotMins = parseTime($(this).data('time'));
-                let slotEndMins = slotMins + 30;
-                
-                if (slotMins < endMins && slotEndMins > startMins) {
-                     $(this).removeClass('border-light bg-white text-dark').addClass('border-primary bg-primary text-white !text-white');
-                }
-            });
-        }
+        renderTimes();
     }
 
     // --- UI POPULATION ---
@@ -174,7 +143,7 @@ $(document).ready(function () {
     // 1. Therapists
     function fetchAndRenderTherapists(branchId) {
         const container = $('#therapist-grid');
-        
+
         if (!bookingData.date) {
             container.html(`
                 <div class="col-span-full py-4 text-center">
@@ -199,59 +168,59 @@ $(document).ready(function () {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ branch_id: branchId, date: bookingData.date })
         })
-        .then(response => response.json())
-        .then(res => {
-            if (res.status && res.data) {
-                res.data.forEach(t => {
-                    const avatar = t.beautician_avatar ? t.beautician_avatar : 'assets/staff/common_female_avatar.svg';
-                    container.append(`
+            .then(response => response.json())
+            .then(res => {
+                if (res.status && res.data) {
+                    res.data.forEach(t => {
+                        const avatar = t.beautician_avatar ? t.beautician_avatar : 'assets/staff/common_female_avatar.svg';
+                        container.append(`
                         <button type="button" class="therapist-btn border-2 border-light bg-white rounded-xl py-3 px-2 flex flex-col items-center justify-center transition-all hover:border-primary/50" data-therapist="${t.beautician_name}" data-id="${t.beautician_id}">
                             <img src="${avatar}" alt="${t.beautician_name}" class="w-12 h-12 rounded-full object-cover mb-2 border border-light">
                             <span class="text-xs font-bold text-gray-500">${t.beautician_name}</span>
                         </button>
                     `);
-                });
+                    });
+                    renderTimes();
+                } else {
+                    renderTimes();
+                }
+            })
+            .catch(err => {
+                console.error("Error fetching therapists:", err);
                 renderTimes();
-            } else {
-                renderTimes();
-            }
-        })
-        .catch(err => {
-            console.error("Error fetching therapists:", err);
-            renderTimes();
-        });
+            });
     }
-    
+
     // Default message setup
     let initialBranchId = $('.outlet-btn.border-primary').data('branchid');
     fetchAndRenderTherapists(initialBranchId);
-    
+
     updateSummary(); // Initialize summary with default outlet
 
     // 2. Dates Generation (Horizontal Scroll)
     function renderDates(startDate = null) {
         const container = $('#date-grid');
         container.empty();
-        
+
         const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
         const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-        
+
         let today = startDate ? new Date(startDate) : new Date();
-        
+
         for (let i = 0; i < 7; i++) {
             let d = new Date(today);
             d.setDate(today.getDate() + i);
-            
+
             let dayName = days[d.getDay()];
             let dateNum = d.getDate();
             let monthName = months[d.getMonth()];
-            
+
             // Format to local YYYY-MM-DD instead of UTC ISO string
             let y = d.getFullYear();
             let m = String(d.getMonth() + 1).padStart(2, '0');
             let dd = String(d.getDate()).padStart(2, '0');
             let fullDateStr = `${y}-${m}-${dd}`;
-            
+
             container.append(`
                 <button type="button" class="date-btn w-full border border-light bg-white rounded-xl py-3 flex flex-col items-center justify-center transition-all hover:border-primary focus:outline-none" data-date="${fullDateStr}">
                     <span class="text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">${dayName}</span>
@@ -282,34 +251,34 @@ $(document).ready(function () {
     function renderCalendar(month, year) {
         const grid = $('#cal-grid');
         grid.empty();
-        
+
         $('#cal-month').text(monthNames[month]);
         $('#cal-year').text(year);
-        
+
         let firstDay = new Date(year, month, 1).getDay();
         let daysInMonth = new Date(year, month + 1, 0).getDate();
-        
+
         let today = new Date();
-        today.setHours(0,0,0,0);
-        
+        today.setHours(0, 0, 0, 0);
+
         // Offset blanks
         for (let i = 0; i < firstDay; i++) {
             grid.append('<div></div>');
         }
-        
+
         // Days
         for (let i = 1; i <= daysInMonth; i++) {
             let cellDate = new Date(year, month, i);
             let isPast = cellDate < today;
-            
+
             // Format to local YYYY-MM-DD instead of UTC ISO string
             let y = cellDate.getFullYear();
             let m = String(cellDate.getMonth() + 1).padStart(2, '0');
             let dd = String(cellDate.getDate()).padStart(2, '0');
             let fullDateStr = `${y}-${m}-${dd}`;
-            
+
             let isSelected = (bookingData.date === fullDateStr);
-            
+
             if (isPast) {
                 grid.append(`<div class="h-10 flex items-center justify-center text-gray-300 font-bold text-base">${i}</div>`);
             } else {
@@ -329,7 +298,7 @@ $(document).ready(function () {
         }, 10);
         renderCalendar(calMonth, calYear);
     }
-    
+
     function closeCalendar() {
         $('#calendar-backdrop').removeClass('opacity-100').addClass('opacity-0');
         $('#calendar-content').removeClass('scale-100 opacity-100').addClass('scale-95 opacity-0');
@@ -340,45 +309,45 @@ $(document).ready(function () {
 
     $(document).on('click', '#btn-more-dates', openCalendar);
     $('#cal-close, #calendar-backdrop').on('click', closeCalendar);
-    
-    $('#cal-prev').on('click', function() {
+
+    $('#cal-prev').on('click', function () {
         calMonth--;
-        if(calMonth < 0) { calMonth = 11; calYear--; }
+        if (calMonth < 0) { calMonth = 11; calYear--; }
         renderCalendar(calMonth, calYear);
     });
-    
-    $('#cal-next').on('click', function() {
+
+    $('#cal-next').on('click', function () {
         calMonth++;
-        if(calMonth > 11) { calMonth = 0; calYear++; }
+        if (calMonth > 11) { calMonth = 0; calYear++; }
         renderCalendar(calMonth, calYear);
         calMonth--;
-        if(calMonth < 0) { calMonth = 11; calYear--; }
+        if (calMonth < 0) { calMonth = 11; calYear--; }
         renderCalendar(calMonth, calYear);
     });
-    
-    $('#cal-next').on('click', function() {
+
+    $('#cal-next').on('click', function () {
         calMonth++;
-        if(calMonth > 11) { calMonth = 0; calYear++; }
+        if (calMonth > 11) { calMonth = 0; calYear++; }
         renderCalendar(calMonth, calYear);
     });
 
     // Calendar Date Selection
-    $(document).on('click', '.cal-day-btn', function() {
+    $(document).on('click', '.cal-day-btn', function () {
         let dateStr = $(this).data('date');
         bookingData.date = dateStr;
         $('#err-date').addClass('hidden');
-        
+
         // Re-render sequence starting from the selected date
         renderDates(dateStr);
-        
+
         // Select the first button which is now the selected date
         let firstBtn = $('.date-btn').first();
         firstBtn.removeClass('border border-light bg-white').addClass('border-2 border-primary bg-primary/10 shadow-md ring-2 ring-primary/30 ring-offset-1');
         firstBtn.find('span:nth-child(2)').removeClass('text-dark').addClass('text-primary');
-        
+
         updateSummary();
         closeCalendar();
-        
+
         let branchId = $('.outlet-btn.border-primary').data('branchid');
         fetchAndRenderTherapists(branchId);
     });
@@ -388,10 +357,10 @@ $(document).ready(function () {
     async function renderTimes() {
         const container = $('#time-grid');
         container.html('<div class="col-span-full py-4 text-center text-gray-400 font-bold">Loading slots...</div>');
-        
+
         let branchId = $('.outlet-btn.border-primary').data('branchid');
         let selectedTherapistId = $('.therapist-btn.border-primary').data('id') || '';
-        
+
         if (!bookingData.date) {
             container.html('<div class="col-span-full py-4 text-center text-gray-400 font-bold">Please select a Date to view available time slots.</div>');
             return;
@@ -413,8 +382,8 @@ $(document).ready(function () {
 
             if (result.status && result.data && result.data.length > 0) {
                 if (result.data[0].label === "Slot not available") {
-                     container.append(`<div class="col-span-3 sm:col-span-4 text-center text-red-500 py-6 font-bold">No slots available or shop is closed on this date.</div>`);
-                     return;
+                    container.append(`<div class="col-span-3 sm:col-span-4 text-center text-red-500 py-6 font-bold">No slots available or shop is closed on this date.</div>`);
+                    return;
                 }
 
                 result.data.forEach((slot) => {
@@ -426,10 +395,15 @@ $(document).ready(function () {
                                 ${displayTime}
                             </button>
                         `);
+                        if (bookingData.time === startTimeOnly) {
+                            bookingData.time = ''; // Clear if the previously selected time is now invalid
+                            $('#err-time').html('<svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Your selected time is no longer available for the updated duration. Please select a new time.').removeClass('hidden');
+                        }
                     } else {
                         let availBeauticiansJson = JSON.stringify(slot.available_beauticians || []);
+                        let activeClasses = (bookingData.time === startTimeOnly) ? 'border-primary bg-primary text-white !text-white' : 'border-light bg-white text-dark hover:border-primary hover:text-primary';
                         container.append(`
-                            <button type="button" class="time-btn time-slot border-2 border-light bg-white rounded-xl py-3 text-xs sm:text-sm font-bold text-dark transition-all hover:border-primary hover:text-primary focus:outline-none relative group px-1" data-time="${startTimeOnly}" data-label="${slot.label}" data-backend-time="${slot.start_time}" data-avail-beauticians='${availBeauticiansJson}'>
+                            <button type="button" class="time-btn time-slot border-2 rounded-xl py-3 text-xs sm:text-sm font-bold transition-all focus:outline-none relative group px-1 ${activeClasses}" data-time="${startTimeOnly}" data-label="${slot.label}" data-backend-time="${slot.start_time}" data-avail-beauticians='${availBeauticiansJson}'>
                                 <span class="time-label relative z-10">${displayTime}</span>
                             </button>
                         `);
@@ -445,10 +419,10 @@ $(document).ready(function () {
     }
 
     // Date Selection
-    $(document).on('click', '.date-btn', function() {
+    $(document).on('click', '.date-btn', function () {
         $('.date-btn').removeClass('border-2 border-primary bg-primary/10 shadow-md ring-2 ring-primary/30 ring-offset-1').addClass('border border-light bg-white');
         $('.date-btn').find('span:nth-child(2)').removeClass('text-primary').addClass('text-dark');
-        
+
         $(this).removeClass('border border-light bg-white').addClass('border-2 border-primary bg-primary/10 shadow-md ring-2 ring-primary/30 ring-offset-1');
         $(this).find('span:nth-child(2)').removeClass('text-dark').addClass('text-primary');
         bookingData.date = $(this).data('date');
@@ -457,10 +431,10 @@ $(document).ready(function () {
     });
 
     // Category Accordion Toggle
-    $(document).on('click', '.category-toggle', function() {
+    $(document).on('click', '.category-toggle', function () {
         const content = $(this).next('.category-content');
         const chevron = $(this).find('.chevron');
-        
+
         if (content.is(':hidden')) {
             content.slideDown();
             chevron.addClass('rotate-180');
@@ -471,16 +445,16 @@ $(document).ready(function () {
     });
 
     // Category Selection
-    $('.cat-pill').on('click', function() {
+    $('.cat-pill').on('click', function () {
         $('.cat-pill').removeClass('bg-primary text-white border-transparent').addClass('bg-white text-gray-600 border-light');
         $(this).removeClass('bg-white text-gray-600 border-light').addClass('bg-primary text-white border-transparent');
-        
+
         let target = $(this).data('target');
-        
+
         // Reset Search
         $('#service-search').val('');
 
-        if(target === 'all') {
+        if (target === 'all') {
             $('.service-category').show();
             // Optional: reset accordion states
             $('.category-content').hide();
@@ -494,11 +468,11 @@ $(document).ready(function () {
             $('#' + target).find('.category-content').slideDown();
             $('#' + target).find('.chevron').addClass('rotate-180');
         }
-        
+
         // Restore Show More button visibility logic after category change
-        $('.show-more-container').each(function() {
+        $('.show-more-container').each(function () {
             let remaining = $(this).closest('.category-content').find('.extra-service.hidden').length;
-            if(remaining > 0) {
+            if (remaining > 0) {
                 $(this).show();
                 $(this).find('.remaining-count').text(remaining);
             } else {
@@ -508,39 +482,39 @@ $(document).ready(function () {
     });
 
     // Outlet Selection
-    $('.outlet-btn').on('click', function() {
+    $('.outlet-btn').on('click', function () {
         $('.outlet-btn').removeClass('border-primary bg-primary/5 text-primary').addClass('border-light bg-white text-gray-500 hover:border-primary/50 hover:bg-gray-50');
         $(this).removeClass('border-light bg-white text-gray-500 hover:border-primary/50 hover:bg-gray-50').addClass('border-primary bg-primary/5 text-primary');
         bookingData.outlet = $(this).data('outlet');
-        
+
         let branchId = $(this).data('branchid');
         fetchAndRenderTherapists(branchId);
-        
+
         $('#err-outlet').addClass('hidden');
         updateSummary();
     });
 
     // Date Selection
-    $(document).on('click', '.date-btn', function() {
+    $(document).on('click', '.date-btn', function () {
         $('.date-btn').removeClass('border-2 border-primary bg-primary/10 shadow-md ring-2 ring-primary/30 ring-offset-1').addClass('border border-light bg-white');
         $('.date-btn').find('span:nth-child(2)').removeClass('text-primary').addClass('text-dark');
-        
+
         $(this).removeClass('border border-light bg-white').addClass('border-2 border-primary bg-primary/10 shadow-md ring-2 ring-primary/30 ring-offset-1');
         $(this).find('span:nth-child(2)').removeClass('text-dark').addClass('text-primary');
         bookingData.date = $(this).data('date');
         $('#err-date').addClass('hidden');
         updateSummary();
-        
+
         let branchId = $('.outlet-btn.border-primary').data('branchid');
         fetchAndRenderTherapists(branchId);
     });
 
     // Time Selection (Dynamic Duration Highlight)
-    $(document).on('click', '.time-btn', function() {
+    $(document).on('click', '.time-btn', function () {
         if (bookingData.time === $(this).data('time')) {
-             clearTimeSelection();
-             updateSummary();
-             return;
+            clearTimeSelection();
+            updateSummary();
+            return;
         }
 
         if (totalDuration === 0) {
@@ -548,59 +522,41 @@ $(document).ready(function () {
             return;
         }
 
+        // 2. Select Time
+        clearTimeSelection();
+
         let startMins = parseTime($(this).data('time'));
         let endMins = startMins + totalDuration;
-        let isValid = true;
 
-        // 1. Check if range overlaps with any blocked slots
-        $('.time-slot').each(function() {
+        $('.time-slot').each(function () {
             let slotMins = parseTime($(this).data('time'));
-            
-            // If this slot falls inside our selected booking duration, it must not be disabled!
-            if (slotMins >= startMins && slotMins < endMins) {
-                if ($(this).prop('disabled')) {
-                    isValid = false;
-                }
-            }
-        });
 
-        if (!isValid) {
-            $('#err-time').html('<svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Not enough consecutive time available for your selected services.').removeClass('hidden');
-            return;
-        }
-
-        // 2. Select Range
-        clearTimeSelection();
-        
-        $('.time-slot').each(function() {
-            let slotMins = parseTime($(this).data('time'));
-            
             if (slotMins >= startMins && slotMins < endMins) {
-                 $(this).removeClass('border-light bg-white text-dark hover:text-primary bg-primary/10 text-primary').addClass('border-primary bg-primary text-white !text-white');
+                $(this).removeClass('border-light bg-white text-dark hover:border-primary hover:text-primary hover:text-primary bg-primary/10 text-primary').addClass('border-primary bg-primary text-white !text-white');
             }
         });
 
         bookingData.time = $(this).data('time');
-        
+
         var availBeauticians = $(this).data('avail-beauticians');
         if (availBeauticians && availBeauticians.length > 0) {
             bookingData.any_assigned_beautician_id = availBeauticians[0];
         } else {
             bookingData.any_assigned_beautician_id = 0;
         }
-        
+
         updateSummary();
     });
 
     // Service Add/Remove
-    $('.btn-add-service').on('click', function() {
+    $('.btn-add-service').on('click', function () {
         const btn = $(this);
         const id = btn.data('id');
         const name = btn.data('name');
         const duration = parseInt(btn.data('duration'));
         const price = parseFloat(btn.data('price'));
 
-        if(btn.hasClass('added')) {
+        if (btn.hasClass('added')) {
             // Remove action (Switch back to ADD visual state)
             btn.removeClass('added').addClass('bg-white text-primary border-primary hover:bg-primary hover:text-white');
             btn.text('+ Add');
@@ -611,28 +567,26 @@ $(document).ready(function () {
             // Add action (Switch to REMOVE visual state)
             btn.addClass('added').removeClass('bg-white text-primary border-primary hover:bg-primary hover:text-white');
             btn.text('Remove');
-            bookingData.services.push({id, name, duration, price});
+            bookingData.services.push({ id, name, duration, price });
             totalDuration += duration;
             totalPrice += price;
             $('#err-services').addClass('hidden');
         }
-        
+
         // Update selected time visuals based on new duration
-        if (bookingData.time) {
-            updateTimeSelectionState();
-        }
+        renderTimes();
         updateSummary();
     });
 
     // Show More Services Logic
-    $(document).on('click', '.btn-show-more', function() {
+    $(document).on('click', '.btn-show-more', function () {
         const container = $(this).closest('.category-content');
         let val = $('#service-search').val().toLowerCase().trim();
-        
+
         let hiddenExtras;
         if (val.length > 0) {
             // In search mode, find all hidden items that match the search
-            hiddenExtras = container.find('.service-item.hidden').filter(function() {
+            hiddenExtras = container.find('.service-item.hidden').filter(function () {
                 let name = $(this).find('.service-name').text().toLowerCase();
                 return name.indexOf(val) > -1;
             });
@@ -640,10 +594,10 @@ $(document).ready(function () {
             // Normal mode
             hiddenExtras = container.find('.extra-service.hidden');
         }
-        
+
         // Reveal next 5
         hiddenExtras.slice(0, 5).removeClass('hidden').show().addClass('revealed');
-        
+
         const remaining = hiddenExtras.length - 5;
         if (remaining > 0) {
             $(this).find('.remaining-count').text(remaining);
@@ -654,37 +608,37 @@ $(document).ready(function () {
     });
 
     // Auto-select text on click/focus
-    $('#service-search').on('focus click', function() {
+    $('#service-search').on('focus click', function () {
         $(this).select();
     });
 
     // Service Search Filter
-    $('#service-search').on('keyup', function() {
+    $('#service-search').on('keyup', function () {
         let val = $(this).val().toLowerCase().trim();
-        
-        if(val.length > 0) {
+
+        if (val.length > 0) {
             $('.cat-pill').removeClass('bg-primary text-white border-transparent').addClass('bg-white text-gray-600 border-light');
             $('.cat-pill[data-target="all"]').removeClass('bg-white text-gray-600 border-light').addClass('bg-primary text-white border-transparent');
-            
+
             $('.category-content').removeClass('hidden').show();
             $('.chevron').addClass('rotate-180');
-            
+
             // Loop through categories to apply search with pagination
-            $('.service-category').each(function() {
-                let matchedItems = $(this).find('.service-item').filter(function() {
+            $('.service-category').each(function () {
+                let matchedItems = $(this).find('.service-item').filter(function () {
                     let name = $(this).find('.service-name').text().toLowerCase();
                     return name.indexOf(val) > -1;
                 });
-                
+
                 // Hide all items initially in this category
                 $(this).find('.service-item').addClass('hidden').hide().removeClass('revealed');
-                
+
                 // Show first 5 matched items
                 matchedItems.slice(0, 5).removeClass('hidden').show().addClass('revealed');
-                
+
                 let remaining = matchedItems.length - 5;
                 let showMoreBtn = $(this).find('.show-more-container');
-                
+
                 if (remaining > 0) {
                     showMoreBtn.show();
                     showMoreBtn.find('.remaining-count').text(remaining);
@@ -692,12 +646,12 @@ $(document).ready(function () {
                     showMoreBtn.hide();
                 }
             });
-            
+
         } else {
             // Restore service items to their default hidden/shown state
-            $('.service-category').each(function() {
+            $('.service-category').each(function () {
                 $(this).removeClass('hidden').show(); // Make sure category is visible
-                $(this).find('.service-item').each(function() {
+                $(this).find('.service-item').each(function () {
                     $(this).removeClass('revealed');
                     if ($(this).hasClass('extra-service')) {
                         $(this).addClass('hidden').hide();
@@ -706,24 +660,24 @@ $(document).ready(function () {
                     }
                 });
             });
-            
+
             // Ensure category pills are visible
             $('.cat-pill').show();
-            
+
             // Trigger click on the first pill to reset the UI correctly
             $('.cat-pill:first').trigger('click');
         }
-        
+
         // Hide empty categories and filter category pills
-        $('.service-category').each(function() {
+        $('.service-category').each(function () {
             let visibleCount = $(this).find('.service-item:not(.hidden)').length;
             let targetCatId = $(this).attr('id');
-            if(visibleCount === 0 && val.length > 0) {
+            if (visibleCount === 0 && val.length > 0) {
                 $(this).addClass('hidden').hide();
-                $('.cat-pill[data-target="'+targetCatId+'"]').hide();
+                $('.cat-pill[data-target="' + targetCatId + '"]').hide();
             } else if (val.length > 0) {
                 $(this).removeClass('hidden').show();
-                $('.cat-pill[data-target="'+targetCatId+'"]').show();
+                $('.cat-pill[data-target="' + targetCatId + '"]').show();
             }
         });
 
@@ -734,12 +688,12 @@ $(document).ready(function () {
             $('#no-services-found').addClass('hidden');
         }
     });
-    
-        // Therapist Selection
-        $(document).on('click', '.therapist-btn', function() {
+
+    // Therapist Selection
+    $(document).on('click', '.therapist-btn', function () {
         $('.therapist-btn').removeClass('border-primary bg-primary/5').addClass('border-light bg-white');
         $('.therapist-btn span').removeClass('text-primary').addClass('text-gray-500');
-        
+
         $(this).removeClass('border-light bg-white').addClass('border-primary bg-primary/5');
         $(this).find('span').removeClass('text-gray-500').addClass('text-primary');
         bookingData.therapist = $(this).data('therapist');
@@ -749,11 +703,11 @@ $(document).ready(function () {
     });
 
     // Payment Selection & Icon Styling
-    $('.payment-label').on('click', function() {
+    $('.payment-label').on('click', function () {
         // Reset all
         $('.payment-label').removeClass('border-primary bg-primary/5').addClass('border-light bg-white');
         $('.payment-label').find('.icon-wrapper').removeClass('bg-white text-primary').addClass('bg-gray-100 text-gray-500');
-        
+
         // Set Active
         $(this).removeClass('border-light bg-white').addClass('border-primary bg-primary/5');
         $(this).find('.icon-wrapper').removeClass('bg-gray-100 text-gray-500').addClass('bg-white text-primary');
@@ -766,7 +720,7 @@ $(document).ready(function () {
     window.appliedCouponDiscountId = 0;
     window.appliedCouponDiscountVal = 0;
 
-    $('#applyCouponBtn').on('click', function() {
+    $('#applyCouponBtn').on('click', function () {
         const code = $('#couponCodeInput').val().trim().toUpperCase();
         if (!code) return;
 
@@ -788,7 +742,7 @@ $(document).ready(function () {
                 getprice: totalPrice,
                 mobile: $('#f-mobile').val().trim()
             }),
-            success: function(res) {
+            success: function (res) {
                 btn.prop('disabled', false).text('Apply');
                 if (res.status && res.data) {
                     window.appliedCouponCode = code;
@@ -799,14 +753,14 @@ $(document).ready(function () {
                     $('#appliedCouponLabel').html(`${code}`);
                     $('#appliedCouponState').removeClass('hidden').addClass('flex');
                     $('#couponMessage').html('<span class="text-success font-bold">Coupon applied successfully!</span>');
-                    
+
                     updateSummary();
                 } else {
                     $('#couponMessage').html(`<span class="text-error font-bold">${res.message || 'Invalid code'}</span>`);
                     $('#couponCodeInput').val('');
                 }
             },
-            error: function() {
+            error: function () {
                 btn.prop('disabled', false).text('Apply');
                 $('#couponMessage').html('<span class="text-error font-bold">Error validating code.</span>');
                 $('#couponCodeInput').val('');
@@ -814,7 +768,7 @@ $(document).ready(function () {
         });
     });
 
-    $('#removeCouponBtn').on('click', function() {
+    $('#removeCouponBtn').on('click', function () {
         window.appliedCouponCode = '';
         window.appliedCouponDiscountId = 0;
         window.appliedCouponDiscountVal = 0;
@@ -832,8 +786,8 @@ $(document).ready(function () {
         document.querySelector(selector).scrollIntoView({ behavior: 'smooth' });
     }
 
-    $('#btn-submit').on('click', function() {
-        
+    $('#btn-submit').on('click', function () {
+
         // Clear previous generic errors
         $('.err-msg').addClass('hidden');
 
@@ -845,7 +799,7 @@ $(document).ready(function () {
         }
 
         // 1. Outlet Check
-        if(!bookingData.outlet) {
+        if (!bookingData.outlet) {
             $('#err-outlet').removeClass('hidden');
             scrollToElement('#sec-outlet');
             return;
@@ -867,7 +821,7 @@ $(document).ready(function () {
         // 4. Therapist Check (Defaults to Any Available)
 
         // 5. Time Check
-        if(!bookingData.time) {
+        if (!bookingData.time) {
             $('#err-time').removeClass('hidden');
             scrollToElement('#sec-time');
             return;
@@ -876,8 +830,8 @@ $(document).ready(function () {
         // 6. Details Check
         const name = $('#f-name').val().trim();
         const mobile = $('#f-mobile').val().trim();
-        
-        if(!name) {
+
+        if (!name) {
             $('#f-name').addClass('border-error').focus();
             $('#err-name').removeClass('hidden');
             scrollToElement('#sec-details');
@@ -885,8 +839,8 @@ $(document).ready(function () {
         } else {
             $('#f-name').removeClass('border-error');
         }
-        
-        if(!mobile) {
+
+        if (!mobile) {
             $('#f-mobile').parent().addClass('border-error');
             $('#f-mobile').focus();
             $('#err-mobile').removeClass('hidden');
@@ -922,7 +876,7 @@ $(document).ready(function () {
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(bookingData),
-            success: function(response) {
+            success: function (response) {
                 if (response && response.success) {
                     // Check if HitPay redirect URL is present
                     if (response.payment_url) {
@@ -933,33 +887,33 @@ $(document).ready(function () {
                     // SUCCESSFUL SUBMISSION
                     // Hide entire form section
                     $('#main-booking-section').addClass('hidden');
-        
-        // Populate Success Screen Details
-        $('#success-booking-id').text(response.ref_no || '#RPS-' + response.booking_id);
-        $('#success-outlet').text(bookingData.outlet);
-        $('#success-date').text(formatDateString(bookingData.date));
-        
-        let startMins = parseTime(bookingData.time);
-        let endMins = startMins + totalDuration;
-        $('#success-time').text(`${bookingData.time} - ${formatTime(endMins)}`);
-        
-        $('#success-therapist').text(response.beautician_name || bookingData.therapist);
-        
-        let displayPaymentMode = bookingData.payment;
-        if (bookingData.payment === 'HitPay') displayPaymentMode = 'HitPay (Online)';
-        $('#success-payment-mode').text(displayPaymentMode);
-        
-        if (bookingData.payment === 'HitPay') {
-            $('#success-payment-status').html('<span class="text-success font-bold">Paid</span>');
-            $('#success-total-label').text('Total Paid');
-        } else {
-            $('#success-payment-status').html('<span class="text-orange-500 font-bold">Pending</span>');
-            $('#success-total-label').text('Payable Amount');
-        }
-        
-        let successServicesHtml = '';
-        bookingData.services.forEach(s => {
-            successServicesHtml += `
+
+                    // Populate Success Screen Details
+                    $('#success-booking-id').text(response.ref_no || '#RPS-' + response.booking_id);
+                    $('#success-outlet').text(bookingData.outlet);
+                    $('#success-date').text(formatDateString(bookingData.date));
+
+                    let startMins = parseTime(bookingData.time);
+                    let endMins = startMins + totalDuration;
+                    $('#success-time').text(`${bookingData.time} - ${formatTime(endMins)}`);
+
+                    $('#success-therapist').text(response.beautician_name || bookingData.therapist);
+
+                    let displayPaymentMode = bookingData.payment;
+                    if (bookingData.payment === 'HitPay') displayPaymentMode = 'HitPay (Online)';
+                    $('#success-payment-mode').text(displayPaymentMode);
+
+                    if (bookingData.payment === 'HitPay') {
+                        $('#success-payment-status').html('<span class="text-success font-bold">Paid</span>');
+                        $('#success-total-label').text('Total Paid');
+                    } else {
+                        $('#success-payment-status').html('<span class="text-orange-500 font-bold">Pending</span>');
+                        $('#success-total-label').text('Payable Amount');
+                    }
+
+                    let successServicesHtml = '';
+                    bookingData.services.forEach(s => {
+                        successServicesHtml += `
             <div class="flex justify-between items-start mb-3 last:mb-0">
                 <div>
                     <span class="font-bold text-dark text-[15px] leading-tight">${s.name}</span>
@@ -967,32 +921,32 @@ $(document).ready(function () {
                 </div>
                 <span class="font-bold text-primary">${formatCurrency(s.price)}</span>
             </div>`;
-        });
-        $('#success-services-list').html(successServicesHtml);
-        
-        $('#success-duration').text(totalDuration + ' mins');
-        
-        // Calculate total considering discount
-        let finalSuccessPrice = totalPrice - (window.appliedCouponDiscountVal || 0);
-        if (finalSuccessPrice < 0) finalSuccessPrice = 0;
-        $('#success-total').text(formatCurrency(finalSuccessPrice));
+                    });
+                    $('#success-services-list').html(successServicesHtml);
 
-        // Show success
-        $('#step-success').removeClass('hidden').addClass('block');
-        
-        // Scroll to top of the widget
-        $('html, body').animate({
-            scrollTop: $('#step-success').offset().top - 100
-        }, 500);
+                    $('#success-duration').text(totalDuration + ' mins');
+
+                    // Calculate total considering discount
+                    let finalSuccessPrice = totalPrice - (window.appliedCouponDiscountVal || 0);
+                    if (finalSuccessPrice < 0) finalSuccessPrice = 0;
+                    $('#success-total').text(formatCurrency(finalSuccessPrice));
+
+                    // Show success
+                    $('#step-success').removeClass('hidden').addClass('block');
+
+                    // Scroll to top of the widget
+                    $('html, body').animate({
+                        scrollTop: $('#step-success').offset().top - 100
+                    }, 500);
 
                 } else {
                     alert('Booking failed: ' + (response.message || 'Unknown error'));
                 }
             },
-            error: function(xhr, status, error) {
+            error: function (xhr, status, error) {
                 alert('A network error occurred: ' + error);
             },
-            complete: function() {
+            complete: function () {
                 btnSubmit.html(originalBtnHtml);
                 btnSubmit.prop('disabled', false);
             }
@@ -1042,11 +996,11 @@ $(document).ready(function () {
 
     const ccSelect = $('#f-cc');
     ccSelect.empty();
-    
+
     // Group Top Countries (SG, MY)
     let topOptions = '';
     let otherOptions = '';
-    
+
     countryCodes.forEach(c => {
         const opt = `<option value="${c.code}" data-format="${c.format}" data-iso="${c.iso}">${c.code} (${c.name})</option>`;
         if (c.code === '+65' || c.code === '+60') {
@@ -1055,7 +1009,7 @@ $(document).ready(function () {
             otherOptions += opt;
         }
     });
-    
+
     ccSelect.html(topOptions + '<option disabled>──────────</option>' + otherOptions);
     ccSelect.val('+65');
 
@@ -1068,14 +1022,14 @@ $(document).ready(function () {
     function formatCountry(state) {
         if (!state.id) { return state.text; } // for the disabled dashed line
         const iso = $(state.element).data('iso');
-        if(!iso) return state.text;
+        if (!iso) return state.text;
         return $(`<span class="flex items-center"><img src="https://flagcdn.com/w20/${iso}.png" class="w-5 h-auto rounded-sm shadow-sm mr-2" /> <span class="font-bold text-dark">${state.text}</span></span>`);
     }
 
     function formatCountrySelection(state) {
         if (!state.id) { return state.text; }
         const iso = $(state.element).data('iso');
-        if(!iso) return state.text;
+        if (!iso) return state.text;
         return $(`<span class="flex items-center"><img src="https://flagcdn.com/w20/${iso}.png" class="w-5 h-auto rounded-sm shadow-sm mr-2" /> <span class="font-bold text-dark">${state.id}</span></span>`);
     }
 
@@ -1090,10 +1044,10 @@ $(document).ready(function () {
     ccSelect.next('.select2-container').addClass('rounded-l-xl border border-r-0 border-light bg-gray-50 py-2 pl-3');
 
     // Handle Mobile Length restriction and flag update UX
-    ccSelect.on('change', function() {
+    ccSelect.on('change', function () {
         const formatLen = $(this).find(':selected').data('format') || 15;
         $('#f-mobile').attr('maxlength', formatLen);
-        
+
         // Update placeholder based on length
         let placeholder = '1234 5678';
         if (formatLen == 8) placeholder = '9123 4567';
@@ -1101,13 +1055,13 @@ $(document).ready(function () {
         else if (formatLen == 10) placeholder = '98765 43210';
         else if (formatLen == 11) placeholder = '1234 567 8901';
         else if (formatLen == 7) placeholder = '123 4567';
-        
+
         $('#f-mobile').attr('placeholder', placeholder);
         $('#f-mobile').val(''); // Clear on change
         updateMobileUX();
     });
 
-    $('#f-mobile').on('input', function() {
+    $('#f-mobile').on('input', function () {
         this.value = this.value.replace(/[^0-9]/g, ''); // Numbers only
         updateMobileUX();
     });
@@ -1115,13 +1069,13 @@ $(document).ready(function () {
     function updateMobileUX() {
         const val = $('#f-mobile').val();
         const max = $('#f-mobile').attr('maxlength') || 8;
-        
+
         // Always show the counter
         $('#mobile-counter').removeClass('hidden').html(`${val.length}/${max}`);
-        
+
         if (val.length > 0) {
             $('#f-mobile').parent().removeClass('border-error');
-            
+
             // Check if max length reached
             if (val.length == max) {
                 const countryCode = $('#f-cc').val();
@@ -1130,30 +1084,30 @@ $(document).ready(function () {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ country_code: countryCode, mobile: val })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    $('#customer-details').removeClass('hidden'); // Reveal details section
-                    
-                    if (data.status && data.data) {
-                        // Customer Found
-                        $('#f-name').val(data.data.contact_fname).prop('readonly', true).addClass('bg-gray-100 cursor-not-allowed text-gray-500').removeClass('bg-white');
-                        
-                        if (data.data.contact_email) {
-                            $('#f-email').val(data.data.contact_email).prop('readonly', true).addClass('bg-gray-100 cursor-not-allowed text-gray-500').removeClass('bg-white');
+                    .then(res => res.json())
+                    .then(data => {
+                        $('#customer-details').removeClass('hidden'); // Reveal details section
+
+                        if (data.status && data.data) {
+                            // Customer Found
+                            $('#f-name').val(data.data.contact_fname).prop('readonly', true).addClass('bg-gray-100 cursor-not-allowed text-gray-500').removeClass('bg-white');
+
+                            if (data.data.contact_email) {
+                                $('#f-email').val(data.data.contact_email).prop('readonly', true).addClass('bg-gray-100 cursor-not-allowed text-gray-500').removeClass('bg-white');
+                            } else {
+                                $('#f-email').val('').prop('readonly', false).addClass('bg-white').removeClass('bg-gray-100 cursor-not-allowed text-gray-500');
+                            }
+
+                            // User requested not to show "Customer found: name (email)"
+                            $('#err-mobile').addClass('hidden').html('');
                         } else {
+                            // Customer Not Found (New)
+                            $('#f-name').val('').prop('readonly', false).addClass('bg-white').removeClass('bg-gray-100 cursor-not-allowed text-gray-500');
                             $('#f-email').val('').prop('readonly', false).addClass('bg-white').removeClass('bg-gray-100 cursor-not-allowed text-gray-500');
+                            $('#err-mobile').removeClass('hidden text-error text-gray-500').addClass('text-primary font-bold').html('New customer? Please provide your details below.');
                         }
-                        
-                        // User requested not to show "Customer found: name (email)"
-                        $('#err-mobile').addClass('hidden').html('');
-                    } else {
-                        // Customer Not Found (New)
-                        $('#f-name').val('').prop('readonly', false).addClass('bg-white').removeClass('bg-gray-100 cursor-not-allowed text-gray-500');
-                        $('#f-email').val('').prop('readonly', false).addClass('bg-white').removeClass('bg-gray-100 cursor-not-allowed text-gray-500');
-                        $('#err-mobile').removeClass('hidden text-error text-gray-500').addClass('text-primary font-bold').html('New customer? Please provide your details below.');
-                    }
-                })
-                .catch(err => console.error(err));
+                    })
+                    .catch(err => console.error(err));
             } else {
                 $('#customer-details').addClass('hidden'); // Hide details if mobile is incomplete
                 $('#err-mobile').addClass('hidden');
@@ -1173,30 +1127,30 @@ $(document).ready(function () {
         // Hide form and show success section with loading state
         $('#main-booking-section').addClass('hidden');
         $('#step-success').removeClass('hidden').addClass('block');
-        
+
         // Show loading card, hide details card
         $('#success-details-card').addClass('hidden');
         $('#success-loading-card').removeClass('hidden');
-        
-        $.get('api/get_booking_details.php?ref_no=' + encodeURIComponent(bookingRef) + '&status=' + encodeURIComponent(hitpayStatus) + '&hitpay_ref=' + encodeURIComponent(hitpayRef), function(response) {
+
+        $.get('api/get_booking_details.php?ref_no=' + encodeURIComponent(bookingRef) + '&status=' + encodeURIComponent(hitpayStatus) + '&hitpay_ref=' + encodeURIComponent(hitpayRef), function (response) {
             // Hide loading card, show details card
             $('#success-loading-card').addClass('hidden');
             $('#success-details-card').removeClass('hidden');
-            
+
             if (response && response.success) {
                 const data = response.data;
-                
+
                 $('#success-booking-id').text(data.ref_no);
                 $('#success-outlet').text(data.outlet);
                 $('#success-date').text(formatDateString(data.date));
-                
+
                 let startMins = parseTime(data.time);
                 let endMins = startMins + parseInt(data.duration);
                 $('#success-time').text(`${data.time} - ${formatTime(endMins)}`);
-                
+
                 $('#success-therapist').text(data.therapist);
                 $('#success-payment-mode').text(data.payment);
-                
+
                 if (data.payment === 'HitPay') {
                     $('#success-payment-status').html('<span class="text-success font-bold">Paid</span>');
                     $('#success-total-label').text('Total Paid');
@@ -1204,7 +1158,7 @@ $(document).ready(function () {
                     $('#success-payment-status').html('<span class="text-orange-500 font-bold">Pending</span>');
                     $('#success-total-label').text('Payable Amount');
                 }
-                
+
                 let successServicesHtml = '';
                 if (data.services && data.services.length > 0) {
                     data.services.forEach(s => {
@@ -1219,10 +1173,10 @@ $(document).ready(function () {
                     });
                 }
                 $('#success-services-list').html(successServicesHtml);
-                
+
                 $('#success-duration').text(data.duration + ' mins');
                 $('#success-total').text(formatCurrency(parseFloat(data.final_price)));
-                
+
                 // Scroll to top of the widget
                 $('html, body').animate({
                     scrollTop: $('#step-success').offset().top - 100
@@ -1230,7 +1184,7 @@ $(document).ready(function () {
             } else {
                 $('#success-services-list').html('<div class="text-center py-4 text-error font-bold">Failed to load booking details. Please check your email for confirmation.</div>');
             }
-        }).fail(function() {
+        }).fail(function () {
             $('#success-services-list').html('<div class="text-center py-4 text-error font-bold">Network error loading details. Please check your email.</div>');
         });
     }
