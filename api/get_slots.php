@@ -265,10 +265,9 @@ if ($booking_beautician <= 0) {
     }
 
     foreach ($start_times as $start_ts) {
-        $requested_end = $start_ts + ($duration_minutes * 60);
-        $end_ts = min($limit, $requested_end);
-        $new_booking_buffered_end = $requested_end + ($break_minutes * 60);
-        $exceeds_limit = ($requested_end > $limit);
+        $end_ts = $start_ts + ($duration_minutes * 60);
+        $new_booking_buffered_end = $end_ts + ($break_minutes * 60);
+        $end_ts = min($limit, $start_ts + ($duration_minutes * 60));
         
         $available_beautician_ids = [];
         $available_beauticians = 0;
@@ -301,22 +300,17 @@ if ($booking_beautician <= 0) {
                 }
             }
             if (!$is_busy) {
+                $available_beauticians++;
                 $available_beautician_ids[] = $beautician_id;
             }
         }
 
-        $available_beauticians = count($available_beautician_ids);
-        $requested_end = $start_ts + ($duration_minutes * 60);
-        $exceeds_limit = ($requested_end > $limit);
-        
-        $isBooked = ($available_beauticians < $total_person) || $exceeds_limit;
-
-        $display_end = $start_ts + (30 * 60);
+        $isBooked = ($available_beauticians < $total_person);
 
         $results[] = [
-            "label" => date('h:i A', $start_ts) . ' - ' . date('h:i A', $display_end),
+            "label" => date('h:i A', $start_ts) . ' - ' . date('h:i A', $end_ts),
             "start_time" => date('H:i', $start_ts),
-            "end_time" => date('H:i', $display_end),
+            "end_time" => date('H:i', $end_ts),
             "isBooked" => $isBooked,
             "isFrozen" => ($now > $start_ts),
             "available_beauticians" => $available_beautician_ids,
@@ -324,6 +318,21 @@ if ($booking_beautician <= 0) {
         ];
     }
     
+    // Explicitly add actual bookings so they show up as greyed-out blocked slots!
+    foreach ($booked_slots as $b) {
+        if ($b['start'] >= $base_time && $b['start'] < $limit) {
+            $results[] = [
+                "label" => date('h:i A', $b['start']) . ' - ' . date('h:i A', $b['end']),
+                "start_time" => date('H:i', $b['start']),
+                "end_time" => date('H:i', $b['end']),
+                "isBooked" => true,
+                "isFrozen" => false,
+                "available_beauticians" => [],
+                "sort_ts" => $b['start']
+            ];
+        }
+    }
+
     usort($results, function($a, $b) {
         return $a['sort_ts'] - $b['sort_ts'];
     });
@@ -428,45 +437,117 @@ if (empty($allowed_intervals)) {
 $cursor = strtotime("$booking_date $day_start_str");
 $limit = strtotime("$booking_date $day_end_str");
 
+$booking_idx = 0;
 $final_slots = [];
+$total_bookings = count($bookings_list);
+
+if (!function_exists('isSlotAllowed')) {
+    function isSlotAllowed($start, $end, $intervals) {
+        foreach ($intervals as $int) {
+            if ($start < $int['end'] && $end > $int['start']) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
 $now = time();
 $slot_duration = $slot_minutes * 60;
 
-$start_times = [];
-$curr_time = $cursor;
-while ($curr_time < $limit) {
-    $start_times[] = $curr_time;
-    $curr_time += $slot_duration;
-}
-
-foreach ($start_times as $s_start) {
-    $is_busy = false;
-    foreach ($bookings_list as $b) {
-        $buffer_time = ($break_minutes * 60);
-        $existing_buffered_end = $b['end'] + $buffer_time;
-        $new_booking_buffered_end = $s_start + ($duration_minutes * 60) + $buffer_time;
+    $start_times = [];
+    $curr_time = $cursor;
+    while ($curr_time < $limit) {
+        $is_conflict = false;
+        $conflict_end = null;
         
-        if ($s_start < $existing_buffered_end && $new_booking_buffered_end > $b['start']) {
-            $is_busy = true;
-            break;
+        $curr_end = $curr_time + ($duration_minutes * 60) + ($break_minutes * 60);
+
+        foreach ($bookings_list as $b) {
+            $b_end_buffered = $b['end'] + ($break_minutes * 60);
+            
+            // Check if our potential slot overlaps with the existing booking
+            if ($curr_time < $b_end_buffered && $curr_end > $b['start']) {
+                $is_conflict = true;
+                if ($conflict_end === null || $b_end_buffered > $conflict_end) {
+                    $conflict_end = $b_end_buffered;
+                }
+            }
+        }
+
+        if ($is_conflict) {
+            $curr_time = $conflict_end;
+        } else {
+            $start_times[] = $curr_time;
+            $curr_time += $slot_duration;
         }
     }
 
-    $requested_end = $s_start + ($duration_minutes * 60);
-    $exceeds_limit = ($requested_end > $limit);
-    
-    $isBooked = $is_busy || $exceeds_limit;
+foreach ($start_times as $s_start) {
+    $s_end = min($limit, $s_start + ($duration_minutes * 60));
+    $new_booking_buffered_end = $s_end + ($break_minutes * 60);
 
-    $display_end = $s_start + (30 * 60);
+    $isBooked = false;
+
+    // Check if the entire duration is covered by allowed intervals
+    $is_allowed = false;
+    foreach ($allowed_intervals as $int) {
+        if ($s_start >= $int['start'] && $s_end <= $int['end']) {
+            $is_allowed = true;
+            break;
+        }
+    }
+    if (!$is_allowed) {
+        $covered = 0;
+        foreach ($allowed_intervals as $int) {
+            if ($int['end'] > $s_start && $int['start'] < $s_end) {
+                $c_start = max($s_start, $int['start']);
+                $c_end = min($s_end, $int['end']);
+                $covered += ($c_end - $c_start);
+            }
+        }
+        if ($covered >= ($s_end - $s_start)) {
+            $is_allowed = true;
+        }
+    }
+
+    if (!$is_allowed) {
+        $isBooked = true;
+    } else {
+        foreach ($bookings_list as $b) {
+            // In frontend, we assume break is always needed because customer is not known yet
+            $buffer_time = ($break_minutes * 60);
+            $existing_buffered_end = $b['end'] + $buffer_time;
+            
+            if ($s_start < $existing_buffered_end && $new_booking_buffered_end > $b['start']) {
+                $isBooked = true;
+                break;
+            }
+        }
+    }
 
     $final_slots[] = [
-        "label" => date('h:i A', $s_start) . ' - ' . date('h:i A', $display_end),
+        "label" => date('h:i A', $s_start) . ' - ' . date('h:i A', $s_end),
         "start_time" => date('H:i', $s_start),
-        "end_time" => date('H:i', $display_end),
+        "end_time" => date('H:i', $s_end),
         "isBooked" => $isBooked,
         "isFrozen" => ($now > $s_start),
         "sort_ts" => $s_start
     ];
+}
+
+// Explicitly add actual bookings so they show up as greyed-out blocked slots!
+foreach ($bookings_list as $b) {
+    if ($b['start'] >= $cursor && $b['start'] < $limit) {
+        $final_slots[] = [
+            "label" => date('h:i A', $b['start']) . ' - ' . date('h:i A', $b['end']),
+            "start_time" => date('H:i', $b['start']),
+            "end_time" => date('H:i', $b['end']),
+            "isBooked" => true,
+            "isFrozen" => false,
+            "sort_ts" => $b['start']
+        ];
+    }
 }
 
 usort($final_slots, function($a, $b) {
